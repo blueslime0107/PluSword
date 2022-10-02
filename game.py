@@ -1,5 +1,8 @@
 
+from glob import glob
+from json import load
 import math
+from os import curdir
 import random
 from select import select
 import time
@@ -35,12 +38,14 @@ game_setting = [0,0,100,100]
 # 캐릭터(0/1), 난이도(0/1/2), 음악볼륨/100, 효과음볼륨/100, 화면설정(0,1)
 #endregion
 #region PictureLoad
+main_char1 = pygame.image.load('resource\Sprites\mainChar1.png').convert_alpha() 
 char1 = pygame.image.load('resource\Sprites\char1.png').convert_alpha()
 char2 = pygame.image.load('resource\Sprites\char2.png').convert_alpha()
 menu = pygame.image.load('resource\Sprites\Menu.png').convert_alpha()
 floor = pygame.image.load('resource\Sprites\Floor.png').convert_alpha()
 others = pygame.image.load('resource\Sprites\others.png').convert_alpha()
 #endregion
+#region PictureCutSave
 a_list = []
 for i in range (0,64,32):
     for j in range (0,192,32):
@@ -49,7 +54,15 @@ for i in range (0,64,32):
         image = pygame.transform.scale(image,(128,128))
         a_list.append(image)
 menu_icon = a_list
+a_list = []
+for i in range (0,256,128):
+    for j in range (0,384,96):
+        image = pygame.Surface((96, 128), pygame.SRCALPHA)
+        image.blit(main_char1, (0,0), Rect(j,i,96,128))
+        a_list.append(image)
+spr_mainChar1 = a_list
 
+#endregion
 #region FontLoad
 menuFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 45)
 capitextFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 30)
@@ -57,6 +70,18 @@ textFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 25)
 numberFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 25)
 damageFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 15)
 #endregion
+
+
+
+
+
+
+def convertImage(surface,x,y,w,h):
+    image = pygame.Surface((w, h), pygame.SRCALPHA)
+    image.blit(surface, (0,0), Rect(x,y,w,h))
+    image = pygame.transform.scale(image,(w*5,h*5))
+    return image
+
 
 class MainItem:
     def __init__(self,num, name, message=[""], icon=pygame.Surface((16,16))):
@@ -68,8 +93,22 @@ class MainItem:
     def active(self):
         global game_setting
         global fullscreen
+        global game_player
+        global game_start
+        global game_lobby
         if(self.num == 0):
             print("Manual")
+        if(self.num == 1):
+            global player_rect
+            global player_tri
+            game_player = player_tri if game_player == player_rect else player_rect
+        if(self.num == 2):
+            gameStart()
+        if(self.num == 3):
+            gameStart()
+        if(self.num == 4):
+            gameStart()
+
         if(self.num == 5):
             game_setting[2] += 5
             if(game_setting[2]>100): game_setting[2] = 100
@@ -90,90 +129,295 @@ class MainItem:
             setFullScreen()
             self.count = int(fullscreen)
 
-
 class Stage:
     def __init__(self,num,enemys = []):
         self.num = num
         self.enemys = enemys
 
 class Player:
-    def __init__(self):
-        self.health
-        self.max_health
-        self.weapon
-        self.item
+    def __init__(self,name,sprite,health,weapon):
+        self.tag = "Player"
+        self.pos = 144
+        self.name = name
+
+        self.image = pygame.Surface((32,32), pygame.SRCALPHA)
+        self.sprite = sprite
+        self.health = health
+        self.max_health = self.health
+        self.weapon = []
+        self.item = []
+        self.weapon.append(weapon)
+        self.behavior = 3
+
+        self.condition = 0
+        self.idle1 = convertImage(self.sprite,0,0,32,32)
+        self.idle2 = convertImage(self.sprite,32,0,32,32)
+        self.icon = convertImage(self.sprite,64,0,32,32)
+        self.ready = convertImage(self.sprite,0,32,96,32)
+        self.attack = convertImage(self.sprite,0,64,96,32)
+        self.damage = convertImage(self.sprite,0,96,96,32)
+
+        self.count = 0
+        self.image = self.idle2
+
+        self.move_point = self.pos
+        self.move_speed = 0
+
+        self.idlespd = 60
+
+    def update(self):
+        if(self.pos != self.move_point):
+            dx = self.move_point - self.pos
+            dx /= self.move_speed
+            self.pos += dx
+            if(abs(self.move_point-self.pos)<2):
+                self.pos = self.move_point
+
+
+    def draw(self,screen):
+        if(self.condition == 0 or self.condition == 1):
+            self.count += 1
+            if(self.count % self.idlespd == 0):
+                if(self.condition == 0):
+                    self.condition = 1
+                    self.count = 0
+                    self.image = self.idle2
+                elif(self.condition == 1):
+                    self.condition = 0
+                    self.count = 0
+                    self.image = self.idle1
+                
+        pos = 0
+        if(self.condition == 0 or self.condition == 1):
+            pos = self.pos
+
+        screen.blit(self.image,(pos-self.image.get_rect().centerx,CHARY))
+
+    def setMove(self,pos,spd):
+        self.move_point = pos
+        self.move_speed = spd
 
 class Weapon:
-    def __init__(self):
-        self.damage
-        self.level
-        self.exp
-        self.max_exp
+    def __init__(self,name,id,level=0, message=[""], icon=pygame.Surface((16,16))):
+        
+        self.id = id 
+        self.count = level
+        self.damage = 5
+        self.exp = 0
+        self.max_exp = 0
+
+        self.name = name        
+        self.message = message
+        self.icon = icon
+    def active(self):
+        global battleManager
+        if(len(battleManager.player_WeaponSlot) < game_player.behavior):
+            battleManager.addPlayerWeaponSlot(self)
+            print(battleManager.player_WeaponSlot)
 
 class Item:
     def __init__(self):
         pass
 
 class Enemy:
-    def __init__(self, name, health, weapon):
+    def __init__(self,name,sprite,health,weapon = Weapon("",0,0)):
+        self.tag = "Enemy"
+        self.pos = 906
         self.name = name
+
+        self.image = pygame.Surface((32,32), pygame.SRCALPHA)
+        self.sprite = sprite
         self.health = health
-        self.max_health = health
+        self.max_health = self.health
         self.weapon = weapon
+        self.item = []
+
+        self.condition = 0
+        self.idle1 = convertImage(self.sprite,0,0,32,32)
+        self.idle2 = convertImage(self.sprite,32,0,32,32)
+        self.icon = convertImage(self.sprite,64,0,32,32)
+        self.ready = convertImage(self.sprite,0,32,96,32)
+        self.attack = convertImage(self.sprite,0,64,96,32)
+        self.damage = convertImage(self.sprite,0,96,96,32)
+
+        self.count = 0
+        self.image = self.idle2
+
+        self.move_point = self.pos
+        self.move_speed = 0
+
+        self.idlespd = 60
+
+    def draw(self,screen):
+        if(self.condition == 0 or self.condition == 1):
+            self.count += 1
+            if(self.count % self.idlespd == 0):
+                if(self.condition == 0):
+                    self.condition = 1
+                    self.count = 0
+                    self.image = self.idle2
+                elif(self.condition == 1):
+                    self.condition = 0
+                    self.count = 0
+                    self.image = self.idle1
+                
+        pos = 0
+        if(self.condition == 0 or self.condition == 1):
+            pos = self.pos
+
+        screen.blit(pygame.transform.flip(self.image,True,False),(pos-self.image.get_rect().centerx,CHARY))
+
+class BattleManager:
+    def __init__(self):
+        self.player = 0
+        self.enemys = []
+
+        self.player_WeaponSlot = []
+
+        self.battle_Chain = []
+    def setPlayerEnemy(self,player,enemys):
+        self.player = player
+        self.enemys = enemys
+
+    def addPlayerWeaponSlot(self,weapon):
+        self.player_WeaponSlot.append(Battle(self.player,weapon))
+
+    def battleStart(self):
+        enemy_WeaponSlot = []
+        for enemy in self.enemys:
+            enemy_WeaponSlot.append(Battle(enemy,enemy.weapon))
+        
+        self.battle_Chain.extend(self.player_WeaponSlot)
+        self.battle_Chain.extend(enemy_WeaponSlot)
 
 
 
 
 
-stage1 = Stage(1,[Enemy("새새색",10,1),Enemy("배애앰",10,2),Enemy("장난꾸러기",10,3)])
+
+class Battle:
+    def __init__(self,attack,weapon):
+        self.attack = attack
+        self.defend = 0
+        self.weapon = weapon
+    def update(self,player,enemys):
+        if(self.attack.tag == "Player"):
+            self.defend = enemys[0]
+        if(self.attack.tag == "Enemy"):
+            self.defend = player
+
+        a = rndNum(2,9)
+        b = rndNum(2,9)
+        value = input(str(a) + str(b))
+        result = value == a +b
+        if(self.attack.tag == "Player"):
+            self.defend.health -= self.weapon.damage
+            if(self.defend.health <= 0):
+                
+        if(self.attack.tag == "Enemy"):
+            self.attack.health -= self.weapon.damage // 5
+        
+        del battleManager.battle_Chain[0]
+
+
+
+
+
+CHARY = 474
+
+keys = {
+    "up": False,
+    "down": False,
+    "left": False,
+    "right": False,
+    "enter": False,
+    "back": False
+}
+
+#region 메뉴관련 변수들
+mainUpVisual = {
+    'text': ''
+    ,'message': ['']
+    , 'icon': pygame.Surface((32,32))
+}
+mainDownVisual = {
+    'text': ''
+    ,'message': ['']
+    , 'icon': pygame.Surface((32,32))
+}
+
+upperItems = []
+downerItems = []
+
+mainCurser = 0
+upperCurser = 0
+downerCurser = 0
+
+#endregion
+
+battleManager = BattleManager()
+curBattle = Battle("a",Weapon(",",0,0))
+
+player_tri = Player("삼각",spr_mainChar1[0],10,Weapon("플러스검",1))
+player_rect = Player("지사",spr_mainChar1[1],9,Weapon("마너스검",2))
+
+game_player = player_tri
+
+game_lobby = True
+game_start = False
+
+stage1 = Stage(1,[Enemy("새새색",spr_mainChar1[2],10,Weapon("플러스검",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("플러스검",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("플러스검",1))])
+
 
 def play_game():
     #region 기초 변수 초기화
+
     #region 기본변수
     global screen
+    global keys
     global fullscreen
+    global mainUpVisual
+    global mainDownVisual
+    global upperItems
+    global downerItems
+    global mainCurser
+    global upperCurser
+    global downerCurser
+    global curBattle
     playing = True
     prev_time = 0
     fullscreen = False
     count = 0
 
 
+    loading = True
+
     menuAble = False
 
-    isLobby = True
-
-    battleBegin = False
-
     curStage = stage1
+
+    
+
     curEnemys = []
 
+    battleStart = False
     #endregion
+
     # region 메인관련변수
     curMenu = "Main"
-    mainCurser = 0
-    upperCurser = 0
-    downerCurser = 0
 
-    mainUpVisual = {
-        'text': ''
-        ,'message': ['']
-        , 'icon': pygame.Surface((32,32))
-    }
-    mainDownVisual = {
-        'text': ''
-        ,'message': ['']
-        , 'icon': pygame.Surface((32,32))
-    }
 
-    upperItems = []
-    downerItems = []
+
+
+
 
     render_message = []
     render_icon = pygame.Surface((32,32))
 
     selectbox = Rect(0,0,0,0)
-#endregion
+    #endregion
 
+    # region 게임 자원들 초기화
     listMainUpper = [MainItem(0,"매뉴얼",["수학으로 죽고사는 게임"],menu_icon[2]),MainItem(1,"캐릭터 설정",["수학으로 죽고사는 게임"],menu_icon[3]),\
         MainItem(2,"쉬움",["수학으로 죽고사는 게임"],menu_icon[4]),MainItem(3,"보통",["수학으로 죽고사는 게임"],menu_icon[5]),MainItem(4,"어려움",["수학으로 죽고사는 게임"],menu_icon[6])]
     listMainDowner = [MainItem(5,"배경음 ▲",["수학으로 죽고사는 게임"],menu_icon[7]),MainItem(6,"배경음 ▼",["수학으로 죽고사는 게임"],menu_icon[8]),\
@@ -190,75 +434,105 @@ def play_game():
     render_message = mainUpVisual["message"]
     render_icon = menu_icon[0]
 
+    menuAble = True
+    #endregion
+
     #endregion
     while(playing):
-        #region basic
+
+        #region 게임의 기초,메뉴 조작
         clock.tick(clock_fps)
         now = time.time()        
         dt = (now-prev_time)*TARGET_FPS        
         prev_time = now
-        keys = pygame.key.get_pressed() 
+
+        keys["up"] = False
+        keys["down"] = False
+        keys["left"] = False
+        keys["right"] = False
+        keys["enter"] = False
+        keys["back"] = False
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT: # 게임끄기
                 playing = False
             if event.type == pygame.KEYDOWN: 
-                if(menuAble):
-                    if curMenu == "Upper":
-                        if event.key == pygame.K_KP4:
-                            curMenu = "Main"
-                            render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
-                            render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
-                        if event.key == pygame.K_KP6:
-                            upperItems[upperCurser].active() # 아이템 발동
-                        if event.key == pygame.K_KP8:
-                            upperCurser -= 1
-                            if upperCurser < 0: upperCurser = len(upperItems)-1
-                            render_message = upperItems[upperCurser].message
-                            render_icon = upperItems[upperCurser].icon
-                        if event.key == pygame.K_KP5:
-                            upperCurser += 1
-                            if upperCurser >= len(upperItems): upperCurser = 0
-                            render_message = upperItems[upperCurser].message
-                            render_icon = upperItems[upperCurser].icon
-                    if curMenu == "Downer":
-                        if event.key == pygame.K_KP4:
-                            curMenu = "Main"
-                            render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
-                            render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
-                        if event.key == pygame.K_KP6:
-                            downerItems[downerCurser].active() # 아이템 발동
-                            
-                        if event.key == pygame.K_KP8:
-                            downerCurser -= 1
-                            if downerCurser < 0: downerCurser = len(downerItems)-1
-                            render_message = downerItems[downerCurser].message
-                            render_icon = downerItems[downerCurser].icon
-                        if event.key == pygame.K_KP5:
-                            downerCurser += 1
-                            if downerCurser >= len(downerItems): downerCurser = 0
-                            render_message = downerItems[downerCurser].message
-                            render_icon = downerItems[downerCurser].icon
-                    if curMenu == "Main":
-                        if event.key == pygame.K_KP6:
-                            if(mainCurser == 0):
-                                curMenu = "Upper"
-                                render_message = upperItems[upperCurser].message
-                                render_icon = upperItems[upperCurser].icon
-                            else:
-                                curMenu = "Downer"
-                                render_message = downerItems[downerCurser].message
-                                render_icon = downerItems[downerCurser].icon
-                        if event.key == pygame.K_KP8:
-                            mainCurser -= 1
-                            if mainCurser < 0: mainCurser = 1
-                            render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
-                            render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
-                        if event.key == pygame.K_KP5:
-                            mainCurser += 1
-                            if mainCurser > 1: mainCurser = 0
-                            render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
-                            render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
+                
+                keys["up"] = event.key == pygame.K_KP8
+                keys["down"] = event.key == pygame.K_KP5
+                keys["left"] = event.key == pygame.K_KP4 
+                keys["right"] = event.key == pygame.K_KP6  
+                keys["enter"] = event.key == pygame.K_KP_ENTER
+                keys["back"] = event.key == pygame.K_KP_PERIOD
+                if event.key == K_F4: setFullScreen()
+            # else:
+            #     keys["up"] = False
+            #     keys["down"] = False
+            #     keys["left"] = False
+            #     keys["right"] = False
+            #     keys["enter"] = False
+            #     keys["back"] = False
+
+                
+
+
+
+        if(menuAble):
+            if curMenu == "Upper":
+                if keys["left"]:
+                    curMenu = "Main"
+                    render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
+                    render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
+                if keys["right"]:
+                    upperItems[upperCurser].active() # 아이템 발동
+                if keys["up"]:
+                    upperCurser -= 1
+                    if upperCurser < 0: upperCurser = len(upperItems)-1
+                    render_message = upperItems[upperCurser].message
+                    render_icon = upperItems[upperCurser].icon
+                if keys["down"]:
+                    upperCurser += 1
+                    if upperCurser >= len(upperItems): upperCurser = 0
+                    render_message = upperItems[upperCurser].message
+                    render_icon = upperItems[upperCurser].icon
+            if curMenu == "Downer":
+                if keys["left"]:
+                    curMenu = "Main"
+                    render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
+                    render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
+                if keys["right"]:
+                    downerItems[downerCurser].active() # 아이템 발동
+                    
+                if keys["up"]:
+                    downerCurser -= 1
+                    if downerCurser < 0: downerCurser = len(downerItems)-1
+                    render_message = downerItems[downerCurser].message
+                    render_icon = downerItems[downerCurser].icon
+                if keys["down"]:
+                    downerCurser += 1
+                    if downerCurser >= len(downerItems): downerCurser = 0
+                    render_message = downerItems[downerCurser].message
+                    render_icon = downerItems[downerCurser].icon
+            if curMenu == "Main":
+                if keys["right"]:
+                    if(mainCurser == 0 and len(upperItems) > 0):
+                        curMenu = "Upper"
+                        render_message = upperItems[upperCurser].message
+                        render_icon = upperItems[upperCurser].icon
+                    elif(mainCurser == 1 and len(downerItems) > 0):
+                        curMenu = "Downer"
+                        render_message = downerItems[downerCurser].message
+                        render_icon = downerItems[downerCurser].icon
+                if keys["up"]:
+                    mainCurser -= 1
+                    if mainCurser < 0: mainCurser = 1
+                    render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
+                    render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
+                if keys["down"]:
+                    mainCurser += 1
+                    if mainCurser > 1: mainCurser = 0
+                    render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
+                    render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
 
 
 
@@ -270,35 +544,77 @@ def play_game():
 
 
 
-                if event.key == K_F4:
-                    setFullScreen()
+
 
         
 
 
 
         #endregion
-        #region 게임진행 메인
-        count += 1
-
-        if isLobby:
+             
+        #region 시작화면
+        if game_lobby:
             listMainDowner[0].count = game_setting[2]
             listMainDowner[1].count = game_setting[2]
             listMainDowner[2].count = game_setting[3]
             listMainDowner[3].count = game_setting[3]
-            
-        # if(count == 30):
-        #     print("Enemy Appeared!")
-        # if(count == 60):
-        #     curEnemys.append(curStage.enemys[rndNum(0,2)])
-        #     print(curEnemys[0].name)
-        menuAble = True
+            game_player.update()            
         #endregion
+        
+        #region 게임
+        if game_start and not loading: 
+
+            #region 화면전환
+            count += 1
+            if(count == 10):
+                print("적 출현!")
+                curEnemys.append(stage1.enemys[rndNum(0,2)])
+            if(count == 20):
+                print(curEnemys[0].name)
+                battleManager.setPlayerEnemy(game_player,curEnemys)
+            if(len(battleManager.player_WeaponSlot) >= game_player.behavior and not battleStart):
+                if keys["enter"]: 
+                    battleManager.battleStart()
+                    battleStart = True
+                if keys["back"]: battleManager.player_WeaponSlot = []
+            
+            if(battleStart):
+                if(len(battleManager.battle_Chain) > 0):
+                    curBattle = battleManager.battle_Chain[0]
+                    curBattle.update(game_player,curEnemys)
+                else:
+                    battleStart = False
+
+
+            #endregion           
+            game_player.update()
+
+
+        if(game_start and loading):
+            count += 1
+            game_player.update()  
+            if(count == 10):
+                game_player.pos = 144
+                game_player.move_point = 144
+                count = 0
+                loading = False
+        
+        
+        
+        
+        #endregion
+
+
         #region 그리기
+
+        #region 기본
+        screen.fill((0,0,0))
         menu_render.blit(menu,(-30,-30))
         submenu_x = 20
         submenu_y = 12
-        #region mainText
+        #endregion
+        
+        #region 메인칸 텍스트
         text_color = (255, 255, 255)
         text = menuFont.render(mainUpVisual["text"],True,text_color)
         text_rect = text.get_rect()
@@ -307,7 +623,8 @@ def play_game():
         text_rect = text.get_rect()
         menu_render.blit(text,(68-text_rect.centerx,270-text_rect.centery))
         #endregion
-        #region subText
+        
+        #region 서브칸 텍스트
         if mainCurser == 0:
             a = 0
             for i in upperItems:
@@ -344,27 +661,30 @@ def play_game():
                 menu_render.blit(number,(446+submenu_x-number_rect.centerx,a*71+submenu_y-b*71))
                 a += 1
         #endregion
-        #region setSelectBoxRect
+        
+        #region 선택박스 렌더링
         if(curMenu == "Main"):
             selectbox.topleft = (0,mainCurser*180)
             selectbox.width = 139
             selectbox.height = 180
         if(curMenu == "Upper"):
             a = upperCurser
-            if(upperCurser>len(upperItems)-3):
-                a = upperCurser - len(upperItems)+5
-            elif(upperCurser>2):
-                a = 2
+            if(len(upperItems)>5):
+                if(upperCurser>len(upperItems)-3):
+                    a = upperCurser - len(upperItems)+5
+                elif(upperCurser>2):
+                    a = 2
 
             selectbox.topleft = (135,71*a)
             selectbox.width = 378
             selectbox.height = 75
         if(curMenu == "Downer"):
             a = downerCurser
-            if(downerCurser>len(downerItems)-3):
-                a = downerCurser - len(downerItems)+5
-            elif(downerCurser>2):
-                a = 2
+            if(len(downerItems)>5):
+                if(downerCurser>len(downerItems)-3):
+                    a = downerCurser - len(downerItems)+5
+                elif(downerCurser>2):
+                    a = 2
 
 
             selectbox.topleft = (135,71*downerCurser)
@@ -374,26 +694,32 @@ def play_game():
         draw_rect_alpha(menu_render,(255,255,255,100),selectbox)      
         #endregion
         
-
-
-        # if(curMenu == "Main"):
+        #region 오른쪽 메세지창,아이콘
         text_color = (255, 255, 255)
         for i in range(0,len(render_message)):            
             if(i==0): text = capitextFont.render(render_message[i],True,text_color)
             else:text = textFont.render(render_message[i],True,text_color)
             text_rect = text.get_rect()
             menu_render.blit(text,(770-text_rect.centerx,226+i*30))
-
-        menu_render.blit(render_icon,(710,39))
-
-
-
-
-
+        menu_render.blit(render_icon,(710,39)) 
+        #endregion
+        
+        #region 메뉴,바닥,배경 그리기 
+             
+        screen.blit(menu,(0,0))
         screen.blit(menu,(0,0))
         screen.blit(menu_render,(30,30))
         screen.blit(floor,(0,HEIGHT-225))
         #endregion
+        
+        #region 캐릭터, 적 그리기
+        game_player.draw(screen)
+        for enemy in curEnemys:
+            enemy.draw(screen)
+        #endregion
+        
+        #endregion
+
         pygame.display.flip() 
 
 
@@ -414,12 +740,38 @@ def play_game():
 
 
 
+def gameStart():
+    global game_start
+    global game_lobby
+    global game_player
+    global upperItems
+    global downerItems
+    global render_icon
+    global render_message
+    global mainCurser
+    global upperCurser
+    global downerCurser
+    game_player.setMove(1080,10)
+    game_start = True
+    game_lobby = False
+    mainUpVisual["text"] = "전투"
+    mainUpVisual["message"] = ["전투","게임을 시작합니다","그리고 끔찍한 악몽이 시작됩니다"]
+    mainUpVisual["icon"] = menu_icon[0]
+    upperItems = game_player.weapon
 
+    mainDownVisual["text"] = "아이템"
+    mainDownVisual["message"] = ["아이템","게임을 시작합니다","그리고 끔찍한 악몽이 시작됩니다"]
+    mainDownVisual["icon"] = menu_icon[1]   
+    downerItems = game_player.item
+    
+    render_message = mainUpVisual["message"]
+    render_icon = menu_icon[0]
 
+    mainCurser = 0
+    upperCurser = 0
+    downerCurser = 0
 
-
-
-
+    menuAble = True
 
 def draw_rect_alpha(surface, color, rect):
     shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
