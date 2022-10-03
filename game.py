@@ -177,6 +177,7 @@ class Weapon:
             progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
     def getWeapon(self):
         if self.id == 1:
+            self.damage = 1
             a = rndNum(1,9)
             b = rndNum(1,9)
             c = a + b
@@ -187,9 +188,6 @@ class Weapon:
 class Item:
     def __init__(self):
         pass
-
-
-
 
 
 class Player:
@@ -330,6 +328,11 @@ class Enemy:
         self.move_point = pos
         self.move_speed = spd
 
+    def changeSavePos(self,pos):
+        self.pos = pos
+        self.move_point = pos
+        self.saved_pos = pos
+
 class BattleManager:
     def __init__(self):
         self.player = Player()
@@ -355,6 +358,10 @@ class BattleManager:
 
             self.battle_Chain.extend(self.player_WeaponSlot)
             self.battle_Chain.extend(enemy_WeaponSlot)
+
+            self.battle_Chain = mixList(self.battle_Chain)
+            
+
             self.battle_Chain_max = len(self.battle_Chain)
             progressBar.updateProgress(self.battle_Chain,self.battle_Chain_max)
             self.battlePre = True
@@ -398,7 +405,7 @@ class Battle:
         self.count = 0
     def update(self,player,enemys):
         global keys
-        
+        #region 전투돌입 전
         if(self.first):       
             if(len(self.question) == 0): self.question, self.answer = self.weapon.getWeapon()  
               
@@ -413,23 +420,26 @@ class Battle:
             self.attack.condition = 2
             self.defend.condition = 2 
             self.first = False
-        # if(self.attack.moving or self.defend.moving):
-        #     return
+        #endregion
 
-
+        #region 전투돌입
         knockback = 100
         if(self.input != "" and not self.delay):
             if(len(str(self.question[self.answer[0]].value)) == len(self.input)):
                 if(self.question[self.answer[0]].value == int(self.input)):
                     self.weapon.time = 0
-                    if(self.attack.tag == "Player") :
+                    if(self.attack.tag == "Player"):
                         self.attack.condition = 3
                         self.defend.condition = 4
+                        self.defend.health -= self.weapon.damage
+                        print(self.defend.health)
                         self.attack.setMove(540-CENTERDIS-knockback,10)
                         self.defend.setMove(540+CENTERDIS+knockback,10)
                     if(self.defend.tag == "Player"):
                         self.attack.condition = 3
                         self.defend.condition = 3
+                        # self.attack.health -= math.ceil(self.weapon.damage/2)
+                        # print(self.defend.health)
                         self.attack.setMove(540+CENTERDIS+knockback//2,10)
                         self.defend.setMove(540-CENTERDIS-knockback//2,10)
                 else:
@@ -438,23 +448,42 @@ class Battle:
 
         if self.delay:
             self.count += 1
-            print(self.count)
             if self.input == "": self.count += 30
             if self.count > 30: 
                 self.count = 0
                 self.delay = False
+                enemy = self.attack if self.attack.tag == "Enemy" else self.defend
+                if enemy.health <= 0:
+                    del battleManager.enemys[0]
+                    for battle in battleManager.battle_Chain[:]:
+                        if(battle.attack == self.defend):
+                            battleManager.battle_Chain.remove(battle)
+                    if(len(battleManager.enemys) <= 0):
+                        battleManager.battle_Chain = []
+                    
+                        
         else:
             self.inputNum()
             self.weapon.time -= 1
-
+        #endregion
                 
-        
-        
 
-        if(self.weapon.time <= 0 and not self.delay):           
-            del battleManager.battle_Chain[0]
+        #region 전투끝
+        if(self.weapon.time <= 0 and not self.delay):   
+            try: 
+                if(len(battleManager.battle_Chain) >= 1):       
+                    del battleManager.battle_Chain[0]
+
+                    enemy = self.attack if self.attack.tag == "Enemy" else self.defend
+                    if(not battleManager.battle_Chain[0].attack == enemy or not battleManager.battle_Chain[0].defend == enemy):
+                        enemy.image = enemy.idle1
+                        enemy.condition = 0
+                        enemy.setMove(enemy.saved_pos,5)
+            except:
+                pass
             if len(battleManager.battle_Chain) <= 0:
                 self.battleEnd()
+        #endregion
 
     def draw(self,board):
         if(len(self.question) == 0): self.question, self.answer = self.weapon.getWeapon()
@@ -486,17 +515,19 @@ class Battle:
         board.blit(text_name,(263+40,27))
         board.blit(text_level,(151+40,27))
         board.blit(text_time,(41,351))
-        pygame.draw.rect(board, text_color, Rect(116,352,self.weapon.time/self.weapon.max_time*946,50), width=0)
+        pygame.draw.rect(board, text_color, Rect(116,352,self.weapon.time/self.weapon.max_time*946,50), width=0)       
 
     def moveBack(self):
-        self.attack.setMove(self.attack.saved_pos,5)
-        self.defend.setMove(self.defend.saved_pos,5)
+        battleManager.player.setMove(battleManager.player.saved_pos,5)
+        for enemy in battleManager.enemys:
+            enemy.setMove(enemy.saved_pos,5)
 
     def battleEnd(self):
-        self.attack.image = self.attack.idle1
-        self.defend.image = self.defend.idle1
-        self.attack.condition = 0
-        self.defend.condition = 0
+        battleManager.player.image = battleManager.player.idle1
+        battleManager.player.condition = 0
+        for enemy in battleManager.enemys:
+            enemy.image = enemy.idle1
+            enemy.condition = 0
         battleManager.battleStart = False
         self.moveBack()
         battleManager.player_WeaponSlot = []
@@ -513,7 +544,6 @@ class Battle:
         if keys["7"]: self.input += "7"
         if keys["8"]: self.input += "8"
         if keys["9"]: self.input += "9"
-
 
 class ProgressBox:
     def __init__(self,var1=0,var2=0,color=(0,0,0)):
@@ -605,6 +635,8 @@ mainCurser = 0
 upperCurser = 0
 downerCurser = 0
 
+menuAble = False
+
 #endregion
 
 battleManager = BattleManager()
@@ -619,13 +651,15 @@ game_player = player_tri
 game_lobby = True
 game_start = False
 
-stage1 = Stage(1,[Enemy("새새색",spr_char1[0],10,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],10,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],10,Weapon("쪼기",1))])
+stage1 = Stage(1,[Enemy("새새색",spr_char1[0],6,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],5,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],4,Weapon("쪼기",1))])
 
 
 def play_game():
+    print(mixList([1,2,3,4,56]))
     #region 기초 변수 초기화
 
     #region 기본변수
+    global menuAble
     global curMenu
     global screen
     global keys
@@ -819,11 +853,15 @@ def play_game():
 
             #region 화면전환
             count += 1
-            if(count == 10):
+            if(count == 60):
+                menuAble = True
                 print("적 출현!")
-                battleManager.enemys.append(stage1.enemys[rndNum(0,2)])
-            if(count == 20):
+                battleManager.enemys.append(copy(stage1.enemys[rndNum(0,2)]))
+                battleManager.enemys.append(copy(stage1.enemys[rndNum(0,2)]))
                 print(battleManager.enemys[0].name)
+                if len(battleManager.enemys) == 2:
+                    battleManager.enemys[0].changeSavePos(806)
+                    battleManager.enemys[1].changeSavePos(1006)
             if(len(battleManager.player_WeaponSlot) >= game_player.behavior and not battleStart):
                 if keys["enter"]: 
                     battleManager.battleStart = True
@@ -834,6 +872,10 @@ def play_game():
             
             if(battleManager.battleStart):
                 battleManager.battle()
+                if(len(battleManager.enemys) <= 0):
+                    menuAble = False
+                    battleManager.battleStart = False
+                    count = 0
 
 
 
@@ -1008,6 +1050,7 @@ def play_game():
 
 
 def gameStart():
+    global menuAble
     global game_start
     global game_lobby
     global game_player
@@ -1056,9 +1099,17 @@ def setFullScreen():
     else:
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
     
-
 def rndNum(min,max):
     return random.randrange(min,max+1)
+
+def mixList(origin_list):
+    origin = copy(origin_list)
+    rand_list = []
+    for i in range(0,len(origin)):
+        rnd = rndNum(0,len(origin)-1)
+        rand_list.append(origin[rnd])
+        del origin[rnd]
+    return rand_list
 
 
 
