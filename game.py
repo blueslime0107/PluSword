@@ -9,7 +9,7 @@ import time
 from re import A
 from turtle import down
 from cv2 import transform
-from numpy import block, full
+from numpy import block, full, number
 from copy import copy
 
 import pygame
@@ -65,6 +65,13 @@ for i in range (0,256,128):
         image.blit(main_char1, (0,0), Rect(j,i,96,128))
         a_list.append(image)
 spr_mainChar1 = a_list
+a_list = []
+for i in range (0,256,128):
+    for j in range (0,384,96):
+        image = pygame.Surface((96, 128), pygame.SRCALPHA)
+        image.blit(char1, (0,0), Rect(j,i,96,128))
+        a_list.append(image)
+spr_char1 = a_list
 
 #endregion
 #region FontLoad
@@ -73,7 +80,7 @@ capitextFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 30)
 textFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 25)
 
 weaponFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 40)
-numberFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 25)
+numberFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 50)
 damageFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 15)
 #endregion
 
@@ -140,6 +147,15 @@ class Stage:
         self.num = num
         self.enemys = enemys
 
+class Num:
+    def __init__(self, value=0):
+        self.value =value
+        self.text = str(value)
+class Sim:
+    def __init__(self, value="+"):
+        self.value = value
+        self.text = str(value)
+
 class Weapon:
     def __init__(self,name,id,level=0, message=[""], icon=pygame.Surface((16,16))):
         self.tag = "Weapon"
@@ -148,7 +164,7 @@ class Weapon:
         self.damage = 5
         self.exp = 0
         self.max_exp = 0
-        self.time = 20
+        self.time = 300
         self.max_time = self.time
 
         self.name = name        
@@ -159,6 +175,22 @@ class Weapon:
         if(len(battleManager.player_WeaponSlot) < game_player.behavior):
             battleManager.addPlayerWeaponSlot(self)
             progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
+    def getWeapon(self):
+        if self.id == 1:
+            a = rndNum(1,9)
+            b = rndNum(1,9)
+            c = a + b
+            question = [Num(a),Sim("+"),Num(b),Sim("="),Num(c)]
+            answer = [4]
+            return question, answer
+
+class Item:
+    def __init__(self):
+        pass
+
+
+
+
 
 class Player:
     def __init__(self,name="삼각",sprite=spr_mainChar1[0],health=10,weapon = Weapon("플러스검",1)):
@@ -217,20 +249,19 @@ class Player:
                     self.condition = 0
                     self.count = 0
                     self.image = self.idle1
-                
-        pos = 0
-        if(self.condition == 0 or self.condition == 1):
-            pos = self.pos
+        if(self.condition == 2):
+            self.image = self.ready
+        if(self.condition == 3):
+            self.image = self.attack
 
-        screen.blit(self.image,(pos-self.image.get_rect().centerx,CHARY))
+        if(self.condition == 4):
+            self.image = self.damage
+
+        screen.blit(self.image,(self.pos-self.image.get_rect().centerx,CHARY))
 
     def setMove(self,pos,spd):
         self.move_point = pos
         self.move_speed = spd
-
-class Item:
-    def __init__(self):
-        pass
 
 class Enemy:
     def __init__(self,name,sprite,health,weapon = Weapon("",0,0)):
@@ -275,12 +306,15 @@ class Enemy:
                     self.condition = 0
                     self.count = 0
                     self.image = self.idle1
-                
-        pos = 0
-        if(self.condition == 0 or self.condition == 1):
-            pos = self.pos
+        if(self.condition == 2):
+            self.image = self.ready
+        if(self.condition == 3):
+            self.image = self.attack
 
-        screen.blit(pygame.transform.flip(self.image,True,False),(pos-self.image.get_rect().centerx,CHARY))
+        if(self.condition == 4):
+            self.image = self.damage
+
+        screen.blit(pygame.transform.flip(self.image,True,False),(self.pos-self.image.get_rect().centerx,CHARY))
 
     def update(self):
         if(self.pos != self.move_point):
@@ -291,6 +325,7 @@ class Enemy:
             if(abs(self.move_point-self.pos)<2):
                 self.moving = False
                 self.pos = self.move_point
+
     def setMove(self,pos,spd):
         self.move_point = pos
         self.move_speed = spd
@@ -354,10 +389,19 @@ class Battle:
         self.attack = attack
         self.defend = 0
         self.weapon = copy(weapon)
+        self.first = True
+        self.question = []
+        self.answer = []
+        self.input = ""
+
+        self.delay = False
         self.count = 0
     def update(self,player,enemys):
-        self.count += 1
-        if(self.count == 1):
+        global keys
+        
+        if(self.first):       
+            if(len(self.question) == 0): self.question, self.answer = self.weapon.getWeapon()  
+              
             if(self.attack.tag == "Player"):
                 self.defend = enemys[0]
                 self.attack.setMove(540-CENTERDIS,10)
@@ -366,24 +410,78 @@ class Battle:
                 self.defend = player
                 self.attack.setMove(540+CENTERDIS,10)
                 self.defend.setMove(540-CENTERDIS,10)
-            
-        if(self.attack.moving or self.defend.moving):
-            return
+            self.attack.condition = 2
+            self.defend.condition = 2 
+            self.first = False
+        # if(self.attack.moving or self.defend.moving):
+        #     return
 
 
-        self.weapon.time -= 1
+        knockback = 100
+        if(self.input != "" and not self.delay):
+            if(len(str(self.question[self.answer[0]].value)) == len(self.input)):
+                if(self.question[self.answer[0]].value == int(self.input)):
+                    self.weapon.time = 0
+                    if(self.attack.tag == "Player") :
+                        self.attack.condition = 3
+                        self.defend.condition = 4
+                        self.attack.setMove(540-CENTERDIS-knockback,10)
+                        self.defend.setMove(540+CENTERDIS+knockback,10)
+                    if(self.defend.tag == "Player"):
+                        self.attack.condition = 3
+                        self.defend.condition = 3
+                        self.attack.setMove(540+CENTERDIS+knockback//2,10)
+                        self.defend.setMove(540-CENTERDIS-knockback//2,10)
+                else:
+                    self.input = ""
+                self.delay = True
 
-        if(self.weapon.time <= 0):           
-            del  battleManager.battle_Chain[0]
+        if self.delay:
+            self.count += 1
+            print(self.count)
+            if self.input == "": self.count += 30
+            if self.count > 30: 
+                self.count = 0
+                self.delay = False
+        else:
+            self.inputNum()
+            self.weapon.time -= 1
+
+                
+        
+        
+
+        if(self.weapon.time <= 0 and not self.delay):           
+            del battleManager.battle_Chain[0]
             if len(battleManager.battle_Chain) <= 0:
                 self.battleEnd()
 
     def draw(self,board):
+        if(len(self.question) == 0): self.question, self.answer = self.weapon.getWeapon()
+        ganguk = 5
         
         text_color = (255,255,255)
         text_name = weaponFont.render(self.weapon.name,True,text_color)
         text_level = weaponFont.render("Lv " + str(self.weapon.count),True,text_color)
         text_time = weaponFont.render(str(math.ceil(self.weapon.time / 60)),True,text_color)
+        text_input = numberFont.render(self.input,True,(0,0,0))
+
+        size = 0
+        for text in range(0,len(self.question)):            
+            text_num = numberFont.render(self.question[text].text,True,text_color)           
+            size += text_num.get_rect().width + ganguk
+        question_render = pygame.Surface((size,213), SRCALPHA)
+        x = 0
+        for text in range(0,len(self.question)):            
+            text_num = numberFont.render(self.question[text].text,True,text_color)         
+            if(text in self.answer): 
+                text_num.fill((255,255,255))  
+                text_num.blit(text_input,(0,0))
+
+            question_render.blit(text_num,(x,0))
+            x += text_num.get_rect().width + ganguk
+        board.blit(question_render,(207+410-size//2,112+86))
+
         board.blit(self.weapon.icon,(16,16))
         board.blit(text_name,(263+40,27))
         board.blit(text_level,(151+40,27))
@@ -395,10 +493,27 @@ class Battle:
         self.defend.setMove(self.defend.saved_pos,5)
 
     def battleEnd(self):
+        self.attack.image = self.attack.idle1
+        self.defend.image = self.defend.idle1
+        self.attack.condition = 0
+        self.defend.condition = 0
         battleManager.battleStart = False
         self.moveBack()
         battleManager.player_WeaponSlot = []
         battleManager.battlePre = False
+
+    def inputNum(self):
+        if keys["0"]: self.input += "0"
+        if keys["1"]: self.input += "1"
+        if keys["2"]: self.input += "2"
+        if keys["3"]: self.input += "3"
+        if keys["4"]: self.input += "4"
+        if keys["5"]: self.input += "5"
+        if keys["6"]: self.input += "6"
+        if keys["7"]: self.input += "7"
+        if keys["8"]: self.input += "8"
+        if keys["9"]: self.input += "9"
+
 
 class ProgressBox:
     def __init__(self,var1=0,var2=0,color=(0,0,0)):
@@ -455,7 +570,18 @@ keys = {
     "left": False,
     "right": False,
     "enter": False,
-    "back": False
+    "back": False,
+    "0": False,
+    "1": False,
+    "2": False,
+    "3": False,
+    "4": False,
+    "5": False,
+    "6": False,
+    "7": False,
+    "8": False,
+    "9": False
+
 }
 
 #region 메뉴관련 변수들
@@ -493,7 +619,7 @@ game_player = player_tri
 game_lobby = True
 game_start = False
 
-stage1 = Stage(1,[Enemy("새새색",spr_mainChar1[2],10,Weapon("쪼기",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("쪼기",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("쪼기",1))])
+stage1 = Stage(1,[Enemy("새새색",spr_char1[0],10,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],10,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],10,Weapon("쪼기",1))])
 
 
 def play_game():
@@ -570,6 +696,16 @@ def play_game():
         keys["right"] = False
         keys["enter"] = False
         keys["back"] = False
+        keys["0"] = False
+        keys["1"] = False
+        keys["2"] = False
+        keys["3"] = False
+        keys["4"] = False
+        keys["5"] = False
+        keys["6"] = False
+        keys["7"] = False
+        keys["8"] = False
+        keys["9"] = False
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT: # 게임끄기
@@ -582,6 +718,16 @@ def play_game():
                 keys["right"] = event.key == pygame.K_KP6  
                 keys["enter"] = event.key == pygame.K_KP_ENTER
                 keys["back"] = event.key == pygame.K_KP_PERIOD
+                keys["0"] = event.key == pygame.K_KP0
+                keys["1"] = event.key == pygame.K_KP1
+                keys["2"] = event.key == pygame.K_KP2
+                keys["3"] = event.key == pygame.K_KP3
+                keys["4"] = event.key == pygame.K_KP4
+                keys["5"] = event.key == pygame.K_KP5
+                keys["6"] = event.key == pygame.K_KP6
+                keys["7"] = event.key == pygame.K_KP7
+                keys["8"] = event.key == pygame.K_KP8
+                keys["9"] = event.key == pygame.K_KP9
                 if event.key == K_F4: setFullScreen()
 
         if(menuAble):
