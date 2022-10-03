@@ -10,6 +10,7 @@ from re import A
 from turtle import down
 from cv2 import transform
 from numpy import block, full
+from copy import copy
 
 import pygame
 from pip import main
@@ -27,6 +28,7 @@ HEIGHT = 720
 
 screen = pygame.display.set_mode((WIDTH,HEIGHT))
 menu_render = pygame.Surface((1020,360), SRCALPHA)
+battleMenu_render = pygame.Surface((1080,416), SRCALPHA)
 monitor_size = [pygame.display.Info().current_w, pygame.display.Info().current_h]
 
 clock = pygame.time.Clock()
@@ -45,6 +47,7 @@ menu = pygame.image.load('resource\Sprites\Menu.png').convert_alpha()
 floor = pygame.image.load('resource\Sprites\Floor.png').convert_alpha()
 others = pygame.image.load('resource\Sprites\others.png').convert_alpha()
 progress = pygame.image.load('resource\Sprites\Bar.png').convert_alpha()
+battleMenu = pygame.image.load('resource\Sprites\BattleMenu.png').convert_alpha()
 #endregion
 #region PictureCutSave
 a_list = []
@@ -68,6 +71,8 @@ spr_mainChar1 = a_list
 menuFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 45)
 capitextFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 30)
 textFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 25)
+
+weaponFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 40)
 numberFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 25)
 damageFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 15)
 #endregion
@@ -135,10 +140,31 @@ class Stage:
         self.num = num
         self.enemys = enemys
 
+class Weapon:
+    def __init__(self,name,id,level=0, message=[""], icon=pygame.Surface((16,16))):
+        self.tag = "Weapon"
+        self.id = id 
+        self.count = level
+        self.damage = 5
+        self.exp = 0
+        self.max_exp = 0
+        self.time = 20
+        self.max_time = self.time
+
+        self.name = name        
+        self.message = message
+        self.icon = icon
+    def active(self):
+        global battleManager
+        if(len(battleManager.player_WeaponSlot) < game_player.behavior):
+            battleManager.addPlayerWeaponSlot(self)
+            progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
+
 class Player:
-    def __init__(self,name="",sprite=pygame.Surface((1,1)),health=0,weapon = []):
+    def __init__(self,name="삼각",sprite=spr_mainChar1[0],health=10,weapon = Weapon("플러스검",1)):
         self.tag = "Player"
         self.pos = 144
+        self.saved_pos = self.pos
         self.name = name
 
         self.image = pygame.Surface((32,32), pygame.SRCALPHA)
@@ -157,6 +183,7 @@ class Player:
         self.ready = convertImage(self.sprite,0,32,96,32)
         self.attack = convertImage(self.sprite,0,64,96,32)
         self.damage = convertImage(self.sprite,0,96,96,32)
+        self.weapon[0].icon = convertImage(self.sprite,64,0,32,32)
 
         self.count = 0
         self.image = self.idle2
@@ -201,24 +228,6 @@ class Player:
         self.move_point = pos
         self.move_speed = spd
 
-class Weapon:
-    def __init__(self,name,id,level=0, message=[""], icon=pygame.Surface((16,16))):
-        
-        self.id = id 
-        self.count = level
-        self.damage = 5
-        self.exp = 0
-        self.max_exp = 0
-
-        self.name = name        
-        self.message = message
-        self.icon = icon
-    def active(self):
-        global battleManager
-        if(len(battleManager.player_WeaponSlot) < game_player.behavior):
-            battleManager.addPlayerWeaponSlot(self)
-            progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
-
 class Item:
     def __init__(self):
         pass
@@ -227,6 +236,7 @@ class Enemy:
     def __init__(self,name,sprite,health,weapon = Weapon("",0,0)):
         self.tag = "Enemy"
         self.pos = 906
+        self.saved_pos = self.pos
         self.name = name
 
         self.image = pygame.Surface((32,32), pygame.SRCALPHA)
@@ -293,6 +303,7 @@ class BattleManager:
         self.player_WeaponSlot = []
 
         self.battle_Chain = []
+        self.battle_Chain_max = 0
 
         self.battleStart = False
         self.battlePre = False
@@ -306,9 +317,11 @@ class BattleManager:
             enemy_WeaponSlot = []
             for enemy in self.enemys:
                 enemy_WeaponSlot.append(Battle(enemy,enemy.weapon))
-            
+
             self.battle_Chain.extend(self.player_WeaponSlot)
             self.battle_Chain.extend(enemy_WeaponSlot)
+            self.battle_Chain_max = len(self.battle_Chain)
+            progressBar.updateProgress(self.battle_Chain,self.battle_Chain_max)
             self.battlePre = True
 
         if(len(self.battle_Chain) > 0):
@@ -334,13 +347,13 @@ class BattleManager:
     def match(self):
         self.count += 1
         self.battle_Chain[0].update(game_player,self.enemys)
-
+        progressBar.updateProgress(self.battle_Chain,self.battle_Chain_max)
 
 class Battle:
     def __init__(self,attack,weapon):
         self.attack = attack
         self.defend = 0
-        self.weapon = weapon
+        self.weapon = copy(weapon)
         self.count = 0
     def update(self,player,enemys):
         self.count += 1
@@ -357,19 +370,35 @@ class Battle:
         if(self.attack.moving or self.defend.moving):
             return
 
-        a = rndNum(2,9)
-        b = rndNum(2,9)
-        value = input(str(a) + str(b))
-        result = value == a +b
-        if(self.attack.tag == "Player"):
-            self.defend.health -= self.weapon.damage
-                
-        if(self.attack.tag == "Enemy"):
-            self.attack.health -= self.weapon.damage // 5
+
+        self.weapon.time -= 1
+
+        if(self.weapon.time <= 0):           
+            del  battleManager.battle_Chain[0]
+            if len(battleManager.battle_Chain) <= 0:
+                self.battleEnd()
+
+    def draw(self,board):
         
-        del battleManager.battle_Chain[0]
-    def moveToCenter(self):
-        self.attack.setMove(11,5)
+        text_color = (255,255,255)
+        text_name = weaponFont.render(self.weapon.name,True,text_color)
+        text_level = weaponFont.render("Lv " + str(self.weapon.count),True,text_color)
+        text_time = weaponFont.render(str(math.ceil(self.weapon.time / 60)),True,text_color)
+        board.blit(self.weapon.icon,(16,16))
+        board.blit(text_name,(263+40,27))
+        board.blit(text_level,(151+40,27))
+        board.blit(text_time,(41,351))
+        pygame.draw.rect(board, text_color, Rect(116,352,self.weapon.time/self.weapon.max_time*946,50), width=0)
+
+    def moveBack(self):
+        self.attack.setMove(self.attack.saved_pos,5)
+        self.defend.setMove(self.defend.saved_pos,5)
+
+    def battleEnd(self):
+        battleManager.battleStart = False
+        self.moveBack()
+        battleManager.player_WeaponSlot = []
+        battleManager.battlePre = False
 
 class ProgressBox:
     def __init__(self,var1=0,var2=0,color=(0,0,0)):
@@ -391,7 +420,12 @@ class ProgressBar:
         self.render_list = lists
         self.render_final = []
         for index in self.render_list:
-            self.render_final.append(ProgressBox(0,0,(255,255,0)))
+            color = (0,0,0)
+            if index.attack.tag == "Player":
+                color = (0,255,0)
+            if index.attack.tag == "Enemy":
+                color = (0,255,255)
+            self.render_final.append(ProgressBox(0,0,color))
         self.render_max = max
 
     def draw(self,screen):
@@ -425,6 +459,8 @@ keys = {
 }
 
 #region 메뉴관련 변수들
+
+curMenu = "Main"
 mainUpVisual = {
     'text': ''
     ,'message': ['']
@@ -457,13 +493,14 @@ game_player = player_tri
 game_lobby = True
 game_start = False
 
-stage1 = Stage(1,[Enemy("새새색",spr_mainChar1[2],10,Weapon("플러스검",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("플러스검",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("플러스검",1))])
+stage1 = Stage(1,[Enemy("새새색",spr_mainChar1[2],10,Weapon("쪼기",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("쪼기",1)),Enemy("배애앰",spr_mainChar1[3],10,Weapon("쪼기",1))])
 
 
 def play_game():
     #region 기초 변수 초기화
 
     #region 기본변수
+    global curMenu
     global screen
     global keys
     global fullscreen
@@ -491,12 +528,6 @@ def play_game():
     #endregion
 
     # region 메인관련변수
-    curMenu = "Main"
-
-
-
-
-
 
     render_message = []
     render_icon = pygame.Surface((32,32))
@@ -552,17 +583,6 @@ def play_game():
                 keys["enter"] = event.key == pygame.K_KP_ENTER
                 keys["back"] = event.key == pygame.K_KP_PERIOD
                 if event.key == K_F4: setFullScreen()
-            # else:
-            #     keys["up"] = False
-            #     keys["down"] = False
-            #     keys["left"] = False
-            #     keys["right"] = False
-            #     keys["enter"] = False
-            #     keys["back"] = False
-
-                
-
-
 
         if(menuAble):
             if curMenu == "Upper":
@@ -680,6 +700,7 @@ def play_game():
         if(game_start and loading):
             count += 1
             game_player.update()  
+            curMenu = "Main"
             if(count == 10):
                 game_player.pos = 144
                 game_player.move_point = 144
@@ -697,6 +718,7 @@ def play_game():
         #region 기본
         screen.fill((0,0,0))
         menu_render.blit(menu,(-30,-30))
+        battleMenu_render.blit(battleMenu,(0,0))
         submenu_x = 20
         submenu_y = 12
         #endregion
@@ -794,16 +816,21 @@ def play_game():
         #region 전투중일때 그리기
         if(battleManager.battleStart):
             draw_rect_alpha(screen,(255,0,0,100),Rect(0,0,1080,720))
+            battleManager.battle_Chain[0].draw(battleMenu_render)
+            screen.blit(battleMenu_render,(0,0))
         #endregion
 
         #region 메뉴,바닥,배경 그리기 
              
         screen.blit(menu,(0,0))
-        screen.blit(menu,(0,0))
         screen.blit(menu_render,(30,30))
         screen.blit(floor,(0,HEIGHT-225))
 
         progressBar.draw(screen)
+        #region 전투중일때 그리기
+        if(battleManager.battleStart):
+            screen.blit(battleMenu_render,(0,0))
+        #endregion
         #endregion
         
         #region 캐릭터, 적 그리기
@@ -845,6 +872,7 @@ def gameStart():
     global mainCurser
     global upperCurser
     global downerCurser
+    global curMenu
     game_player.setMove(1080,10)
     game_start = True
     game_lobby = False
