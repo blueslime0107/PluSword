@@ -48,6 +48,11 @@ floor = pygame.image.load('resource\Sprites\Floor.png').convert_alpha()
 others = pygame.image.load('resource\Sprites\others.png').convert_alpha()
 progress = pygame.image.load('resource\Sprites\Bar.png').convert_alpha()
 battleMenu = pygame.image.load('resource\Sprites\BattleMenu.png').convert_alpha()
+stage1Bg = [pygame.image.load('resource\Sprites\stage1\\bga.png').convert_alpha(),
+pygame.image.load('resource\Sprites\stage1\\bgb1.png').convert_alpha(),
+pygame.image.load('resource\Sprites\stage1\\bgb2.png').convert_alpha(),
+pygame.image.load('resource\Sprites\stage1\\bgb3.png').convert_alpha(),
+pygame.image.load('resource\Sprites\stage1\land.png').convert_alpha()]
 #endregion
 #region PictureCutSave
 a_list = []
@@ -94,6 +99,11 @@ def convertImage(surface,x,y,w,h):
     image.blit(surface, (0,0), Rect(x,y,w,h))
     image = pygame.transform.scale(image,(w*5,h*5))
     return image
+
+def draw_rect_alpha(surface, color, rect):
+    shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
+    pygame.draw.rect(shape_surf, color, shape_surf.get_rect())
+    surface.blit(shape_surf, rect)
 
 
 class MainItem:
@@ -157,13 +167,117 @@ class Sim:
         self.text = str(value)
 
 class Weapon:
-    def __init__(self,name,id,level=0, message=[""], icon=pygame.Surface((16,16))):
+    def __init__(self,name,id,icon=pygame.Surface((16,16)),level=0,lvUpList = [2,4,8,16,32], message=[""]):
         self.tag = "Weapon"
         self.id = id 
         self.count = level
         self.damage = 5
         self.exp = 0
         self.max_exp = 0
+        self.lvUpList = lvUpList
+        self.lvUpList.append(999)
+        self.time = 300
+        self.max_time = self.time
+
+        self.name = name        
+        self.message = message
+        self.icon = icon
+
+        self.rndList = []
+        self.dmgList = []
+
+        self.preSetWeapon()
+
+
+    def active(self):
+        global battleManager
+        if(len(battleManager.player_WeaponSlot) < game_player.behavior):
+            battleManager.addPlayerWeaponSlot(self)
+            progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
+    def preSetWeapon(self):
+        if self.id == 1:
+            self.rndList = [(1,9),(10,20),(60,100),(50,200)]
+            self.dmgList = [1,2,4,8]
+
+    def getWeapon(self):
+        self.damage = 0
+        if self.id == 1:
+            self.damage = self.dmgList[self.count]
+            a = rndTup(self.rndList[self.count])
+            b = rndTup(self.rndList[self.count])
+            c = a + b
+            question = [Num(a),Sim("+"),Num(b),Sim("="),Num(c)]
+            answer = [4]
+            return question, answer
+        if self.id == 2:
+            self.damage = 1
+            a = rndNum(1,9)
+            b = rndNum(1,9)
+            c = a - b
+            question = [Num(a),Sim("-"),Num(b),Sim("="),Num(c)]
+            answer = [4]
+            return question, answer
+        if self.id == 3:
+            self.damage = 1
+            a = rndNum(1,9)
+            b = rndNum(1,9)
+            rnd = rndNum(0,1)
+            sim = ""
+            if(rnd == 0):
+                c = a + b
+                sim = "+"
+            else:
+                a,b= bigLeftChange(a,b)
+                c = a - b
+                sim = "-"  
+            question = [Num(a),Sim(sim),Num(b),Sim("="),Num(c)]
+            answer = [4]
+            return question, answer
+        if self.id == 4:
+            self.damage = 1
+            randa = rndNum(3,6)
+            b = 0
+            question = []
+            for i in range(0,randa):
+                rnd = rndNum(1,5)
+                question.append(Num(rnd))
+                question.append(Sim("+"))
+                b += rnd
+
+            question.append(Sim("="))
+            question.append(Num(b))
+
+            answer = [len(question)-1]
+            return question, answer
+        if self.id == 5:
+            self.damage = 1
+            a = rndNum(1,9)
+            b = rndNum(1,9)
+            rnd = rndNum(0,1)
+            sim = ""
+            if(rnd == 0):
+                c = a + b
+                sim = "+"
+            else:
+                a,b=bigLeftChange(a,b)
+                c = a - b
+                sim = "-"  
+            question = [Num(a),Sim(sim),Num(b),Sim("="),Num(c)]
+            answer = [rndNum(0,1)*2]
+            return question, answer
+    def levelRndNum(self):
+        rndNum(1,9)
+
+    def levelUp(self):
+        self.exp = 0
+        self.count += 1
+        self.max_exp = self.lvUpList[self.count]
+
+class Item:
+    def __init__(self,name,id,level=0, message=[""], icon=pygame.Surface((16,16))):
+        self.tag = "Weapon"
+        self.id = id 
+        self.count = level
         self.time = 300
         self.max_time = self.time
 
@@ -171,27 +285,13 @@ class Weapon:
         self.message = message
         self.icon = icon
     def active(self):
-        global battleManager
-        if(len(battleManager.player_WeaponSlot) < game_player.behavior):
-            battleManager.addPlayerWeaponSlot(self)
-            progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
-    def getWeapon(self):
-        if self.id == 1:
-            self.damage = 1
-            a = rndNum(1,9)
-            b = rndNum(1,9)
-            c = a + b
-            question = [Num(a),Sim("+"),Num(b),Sim("="),Num(c)]
-            answer = [4]
-            return question, answer
-
-class Item:
-    def __init__(self):
-        pass
+        if(self.id == 1):
+            battleManager.player.health += 5
+        battleManager.player.item.remove(self)
 
 
 class Player:
-    def __init__(self,name="삼각",sprite=spr_mainChar1[0],health=10,weapon = Weapon("플러스검",1)):
+    def __init__(self,name="삼각",sprite=spr_mainChar1[0],health=10):
         self.tag = "Player"
         self.pos = 144
         self.saved_pos = self.pos
@@ -203,8 +303,8 @@ class Player:
         self.max_health = self.health
         self.weapon = []
         self.item = []
-        self.weapon.append(weapon)
         self.behavior = 3
+        self.time_beul = 3
 
         self.condition = 0
         self.idle1 = convertImage(self.sprite,0,0,32,32)
@@ -213,7 +313,7 @@ class Player:
         self.ready = convertImage(self.sprite,0,32,96,32)
         self.attack = convertImage(self.sprite,0,64,96,32)
         self.damage = convertImage(self.sprite,0,96,96,32)
-        self.weapon[0].icon = convertImage(self.sprite,64,0,32,32)
+        
 
         self.count = 0
         self.image = self.idle2
@@ -223,6 +323,13 @@ class Player:
         self.move_speed = 0
 
         self.idlespd = 60
+        
+        self.name_surface = capitextFont.render(self.name,True,(255,255,255))        
+        self.name_surface_rect = self.name_surface.get_rect()
+        draw_rect_alpha(self.name_surface,(0,0,0,200),self.name_surface_rect)
+        self.name_surface.blit(capitextFont.render(self.name,True,(255,255,255)),(0,0))
+        self.health_surface = pygame.Surface((180, 15))
+        self.health_surface_rect = self.health_surface.get_rect()
 
     def update(self):
         if(self.pos != self.move_point):
@@ -234,7 +341,6 @@ class Player:
                 self.moving = False
                 self.pos = self.move_point
 
-
     def draw(self,screen):
         if(self.condition == 0 or self.condition == 1):
             self.count += 1
@@ -242,11 +348,11 @@ class Player:
                 if(self.condition == 0):
                     self.condition = 1
                     self.count = 0
-                    self.image = self.idle2
+                    self.image = self.idle1
                 elif(self.condition == 1):
                     self.condition = 0
                     self.count = 0
-                    self.image = self.idle1
+                    self.image = self.idle2
         if(self.condition == 2):
             self.image = self.ready
         if(self.condition == 3):
@@ -256,23 +362,38 @@ class Player:
             self.image = self.damage
 
         screen.blit(self.image,(self.pos-self.image.get_rect().centerx,CHARY))
+        screen.blit(self.name_surface,(self.pos-self.name_surface_rect.centerx,CHARY-25))
+
+        self.health_surface.fill((0,0,0))
+        pygame.draw.rect(self.health_surface, (255,255,255), (3,3,self.health/self.max_health*174,9))
+        screen.blit(self.health_surface,(self.pos-self.health_surface_rect.centerx,CHARY+160))
+        health_text = capitextFont.render(str(self.health),True,(0,0,0))
+        health_text.fill((0,0,0))
+        health_text.blit(capitextFont.render(str(self.health),True,(255,255,255)),(0,0))
+        screen.blit(health_text,(self.pos-health_text.get_rect().centerx,CHARY+160+15))
+
 
     def setMove(self,pos,spd):
         self.move_point = pos
         self.move_speed = spd
 
+    def giveWeapon(self,weapon):
+        self.weapon.append(copy(weapon))
+    def giveItem(self,item):
+        self.item.append(copy(item))
+
 class Enemy:
     def __init__(self,name,sprite,health,weapon = Weapon("",0,0)):
         self.tag = "Enemy"
-        self.pos = 906
-        self.saved_pos = self.pos
+        self.pos = 1100
+        self.saved_pos = 0
         self.name = name
 
         self.image = pygame.Surface((32,32), pygame.SRCALPHA)
         self.sprite = sprite
         self.health = health
         self.max_health = self.health
-        self.weapon = weapon
+        self.weapon = copy(weapon)
         self.item = []
 
         self.condition = 0
@@ -292,6 +413,12 @@ class Enemy:
 
         self.idlespd = 60
 
+        self.name_surface = capitextFont.render(self.name,True,(255,255,255))   
+        self.name_surface_rect = self.name_surface.get_rect()
+        draw_rect_alpha(self.name_surface,(0,0,0,200),self.name_surface_rect)
+        self.name_surface.blit(capitextFont.render(self.name,True,(255,255,255)),(0,0))
+        self.health_surface = pygame.Surface((180, 15))
+        self.health_surface_rect = self.health_surface.get_rect()
     def draw(self,screen):
         if(self.condition == 0 or self.condition == 1):
             self.count += 1
@@ -299,11 +426,11 @@ class Enemy:
                 if(self.condition == 0):
                     self.condition = 1
                     self.count = 0
-                    self.image = self.idle2
+                    self.image = self.idle1
                 elif(self.condition == 1):
                     self.condition = 0
                     self.count = 0
-                    self.image = self.idle1
+                    self.image = self.idle2
         if(self.condition == 2):
             self.image = self.ready
         if(self.condition == 3):
@@ -313,6 +440,15 @@ class Enemy:
             self.image = self.damage
 
         screen.blit(pygame.transform.flip(self.image,True,False),(self.pos-self.image.get_rect().centerx,CHARY))
+        screen.blit(self.name_surface,(self.pos-self.name_surface_rect.centerx,CHARY-25))
+
+        self.health_surface.fill((0,0,0))
+        pygame.draw.rect(self.health_surface, (255,255,255), (3,3,self.health/self.max_health*174,9))
+        screen.blit(self.health_surface,(self.pos-self.health_surface_rect.centerx,CHARY+160))
+        health_text = capitextFont.render(str(self.health),True,(0,0,0))
+        health_text.fill((0,0,0))
+        health_text.blit(capitextFont.render(str(self.health),True,(255,255,255)),(0,0))
+        screen.blit(health_text,(self.pos-health_text.get_rect().centerx,CHARY+160+15))
 
     def update(self):
         if(self.pos != self.move_point):
@@ -323,6 +459,7 @@ class Enemy:
             if(abs(self.move_point-self.pos)<2):
                 self.moving = False
                 self.pos = self.move_point
+                if(self.saved_pos == 0): self.saved_pos = self.pos
 
     def setMove(self,pos,spd):
         self.move_point = pos
@@ -369,20 +506,6 @@ class BattleManager:
         if(len(self.battle_Chain) > 0):
             self.match()
 
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
         else:
             self.battleStart = False
 
@@ -396,12 +519,16 @@ class Battle:
         self.attack = attack
         self.defend = 0
         self.weapon = copy(weapon)
+        self.originWeapon = weapon
         self.first = True
         self.question = []
         self.answer = []
         self.input = ""
+        self.failed = False
 
         self.delay = False
+        self.bool = False
+        self.bool2 = False
         self.count = 0
     def update(self,player,enemys):
         global keys
@@ -417,49 +544,65 @@ class Battle:
                 self.defend = player
                 self.attack.setMove(540+CENTERDIS,10)
                 self.defend.setMove(540-CENTERDIS,10)
+
+            
             self.attack.condition = 2
             self.defend.condition = 2 
             self.first = False
+        player = self.attack if self.attack.tag == "Player" else self.defend
+        enemy = self.attack if self.attack.tag == "Enemy" else self.defend
         #endregion
 
         #region 전투돌입
         knockback = 100
-        if(self.input != "" and not self.delay):
+        if(self.input != "" and not self.delay and not self.failed): # 답 입력시
             if(len(str(self.question[self.answer[0]].value)) == len(self.input)):
                 if(self.question[self.answer[0]].value == int(self.input)):
-                    self.weapon.time = 0
+                    self.originWeapon.exp += 1
+                    if self.originWeapon.exp >= self.originWeapon.max_exp: 
+                        self.originWeapon.levelUp()
+                    
                     if(self.attack.tag == "Player"):
                         self.attack.condition = 3
                         self.defend.condition = 4
-                        self.defend.health -= self.weapon.damage
-                        print(self.defend.health)
+                        if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul:
+                            self.weapon.damage *= 2
+                        self.defend.health -=  self.weapon.damage
                         self.attack.setMove(540-CENTERDIS-knockback,10)
                         self.defend.setMove(540+CENTERDIS+knockback,10)
                     if(self.defend.tag == "Player"):
                         self.attack.condition = 3
                         self.defend.condition = 3
-                        # self.attack.health -= math.ceil(self.weapon.damage/2)
-                        # print(self.defend.health)
+                        if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul:
+                            self.attack.health -=  math.ceil(self.weapon.damage/2)
+                        self.attack.condition = 4
                         self.attack.setMove(540+CENTERDIS+knockback//2,10)
                         self.defend.setMove(540-CENTERDIS-knockback//2,10)
+                    self.weapon.time = 0
+                    self.bool = True
+                    self.delay = True
                 else:
                     self.input = ""
-                self.delay = True
+                    self.failed = True
+                    self.weapon.time = 0
 
         if self.delay:
             self.count += 1
-            if self.input == "": self.count += 30
+            # if self.input == "" and not self.bool: self.count += 30
             if self.count > 30: 
                 self.count = 0
                 self.delay = False
-                enemy = self.attack if self.attack.tag == "Enemy" else self.defend
-                if enemy.health <= 0:
-                    del battleManager.enemys[0]
-                    for battle in battleManager.battle_Chain[:]:
-                        if(battle.attack == self.defend):
-                            battleManager.battle_Chain.remove(battle)
-                    if(len(battleManager.enemys) <= 0):
-                        battleManager.battle_Chain = []
+                
+                if self.bool2: self.bool = True
+                if not self.failed:
+                    enemy = self.attack if self.attack.tag == "Enemy" else self.defend
+                    if enemy.health <= 0:
+                        del battleManager.enemys[0]
+                        for battle in battleManager.battle_Chain[:]:
+                            if(battle.attack == self.defend):
+                                battleManager.battle_Chain.remove(battle)
+                        if(len(battleManager.enemys) <= 0):
+                            battleManager.battle_Chain = []
                     
                         
         else:
@@ -470,17 +613,41 @@ class Battle:
 
         #region 전투끝
         if(self.weapon.time <= 0 and not self.delay):   
-            try: 
-                if(len(battleManager.battle_Chain) >= 1):       
-                    del battleManager.battle_Chain[0]
 
-                    enemy = self.attack if self.attack.tag == "Enemy" else self.defend
-                    if(not battleManager.battle_Chain[0].attack == enemy or not battleManager.battle_Chain[0].defend == enemy):
-                        enemy.image = enemy.idle1
-                        enemy.condition = 0
-                        enemy.setMove(enemy.saved_pos,5)
-            except:
-                pass
+            if not self.bool:
+                self.originWeapon.exp += 1
+                if self.originWeapon.exp >= self.originWeapon.max_exp: 
+                    self.originWeapon.levelUp()
+                
+                if(self.attack.tag == "Enemy"):
+                    self.attack.condition = 3
+                    self.defend.condition = 4
+                    self.defend.health -=  self.weapon.damage
+                    self.attack.setMove(540+CENTERDIS+knockback//2,10)
+                    self.defend.setMove(540-CENTERDIS-knockback//2,10)
+
+                if(self.defend.tag == "Enemy"):
+                    self.attack.condition = 4
+                    self.defend.condition = 3
+                    # if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul:
+                    #     self.weapon.damage *= 2
+                    self.attack.health -=  math.ceil(self.weapon.damage/2)
+                    self.attack.setMove(540-CENTERDIS-knockback,10)
+                    self.defend.setMove(540+CENTERDIS+knockback,10)
+
+
+                self.delay = True
+                self.bool2 = True
+
+            if self.bool:
+                try:
+                    if(len(battleManager.battle_Chain) >= 1):       
+                        del battleManager.battle_Chain[0]
+                        if(not battleManager.battle_Chain[0].attack == enemy or not battleManager.battle_Chain[0].defend == enemy):
+                            enemy.image = enemy.idle1
+                            enemy.condition = 0
+                            enemy.setMove(enemy.saved_pos,5)
+                except:pass
             if len(battleManager.battle_Chain) <= 0:
                 self.battleEnd()
         #endregion
@@ -515,7 +682,9 @@ class Battle:
         board.blit(text_name,(263+40,27))
         board.blit(text_level,(151+40,27))
         board.blit(text_time,(41,351))
-        pygame.draw.rect(board, text_color, Rect(116,352,self.weapon.time/self.weapon.max_time*946,50), width=0)       
+        pygame.draw.rect(board, (0,255,255) if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul else (255,255,255) , Rect(116,352,self.weapon.time/self.weapon.max_time*946,50), width=0)     
+
+
 
     def moveBack(self):
         battleManager.player.setMove(battleManager.player.saved_pos,5)
@@ -523,6 +692,7 @@ class Battle:
             enemy.setMove(enemy.saved_pos,5)
 
     def battleEnd(self):
+        global curMenu, mainCurser
         battleManager.player.image = battleManager.player.idle1
         battleManager.player.condition = 0
         for enemy in battleManager.enemys:
@@ -532,6 +702,8 @@ class Battle:
         self.moveBack()
         battleManager.player_WeaponSlot = []
         battleManager.battlePre = False
+        curMenu = "Main"
+        mainCurser = 0
 
     def inputNum(self):
         if keys["0"]: self.input += "0"
@@ -544,6 +716,8 @@ class Battle:
         if keys["7"]: self.input += "7"
         if keys["8"]: self.input += "8"
         if keys["9"]: self.input += "9"
+        if keys["back"]: self.input = ""
+        if keys["minus"]: self.input += "-"
 
 class ProgressBox:
     def __init__(self,var1=0,var2=0,color=(0,0,0)):
@@ -581,7 +755,18 @@ class ProgressBar:
             self.render_final[index].draw(self.render,index,blocksize)
         screen.blit(self.render,(0,410))
 
-
+class BackGround:
+    def __init__(self,image,speed,y):
+        self.image = pygame.transform.scale2x(image)
+        self.speed = speed
+        self.y = y
+        self.x = self.image.get_rect().width
+    def draw(self,bgx):
+        rel_x = -bgx*self.speed % self.x 
+        screen.blit(self.image, (rel_x - self.x ,self.y))
+        if rel_x < self.x :
+            screen.blit(self.image,(rel_x,self.y))
+        bgx += 1 
 
 
 
@@ -610,8 +795,27 @@ keys = {
     "6": False,
     "7": False,
     "8": False,
-    "9": False
+    "9": False,
+    "minus": False
 
+}
+
+weapons = { 
+    "플러스검": Weapon("플러스검",1, convertImage(spr_mainChar1[0],64,0,32,32)),
+    "마너스검": Weapon("마너스검",2, convertImage(spr_mainChar1[1],64,0,32,32)),
+    "쪼기": Weapon("쪼기",3,convertImage(spr_char1[0],64,0,32,32)),
+    "뱀꼬리": Weapon("뱀꼬리",4,convertImage(spr_char1[1],64,0,32,32)),
+    "부메랑": Weapon("부메랑",5,convertImage(spr_char1[2],64,0,32,32))
+}
+
+items = {
+    "간식": Item("간식",1)
+}
+
+enemys = {
+    "새새색": Enemy("새새색",spr_char1[0],4,weapons["쪼기"]),
+    "배애앰": Enemy("배애앰",spr_char1[1],4,weapons["뱀꼬리"]),
+    "장난질": Enemy("장난질",spr_char1[2],5,weapons["부메랑"])
 }
 
 #region 메뉴관련 변수들
@@ -643,15 +847,28 @@ battleManager = BattleManager()
 progressBar = ProgressBar()
 curBattle = Battle("a",Weapon(",",0,0))
 
-player_tri = Player("삼각",spr_mainChar1[0],10,Weapon("플러스검",1))
-player_rect = Player("지사",spr_mainChar1[1],9,Weapon("마너스검",2))
+background_list = []
+
+background_list.append(BackGround(stage1Bg[0],1,0))
+background_list.append(BackGround(stage1Bg[1],3,0))
+background_list.append(BackGround(stage1Bg[2],5,0))
+background_list.append(BackGround(stage1Bg[3],10,0))
+background_list.append(BackGround(stage1Bg[4],10,0))
+
+player_tri = Player("삼각",spr_mainChar1[0],10)
+player_rect = Player("지사",spr_mainChar1[1],9)
+
+player_tri.giveItem(items["간식"])
+player_tri.giveItem(items["간식"])
+player_tri.giveItem(items["간식"])
+player_tri.giveWeapon(weapons["플러스검"])
 
 game_player = player_tri
 
 game_lobby = True
 game_start = False
 
-stage1 = Stage(1,[Enemy("새새색",spr_char1[0],6,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],5,Weapon("쪼기",1)),Enemy("배애앰",spr_char1[0],4,Weapon("쪼기",1))])
+stage1 = Stage(1,[enemys["새새색"],enemys["배애앰"],enemys["장난질"]])
 
 
 def play_game():
@@ -676,6 +893,8 @@ def play_game():
     prev_time = 0
     fullscreen = False
     count = 0
+
+    bgx = 0
 
 
     loading = True
@@ -740,6 +959,7 @@ def play_game():
         keys["7"] = False
         keys["8"] = False
         keys["9"] = False
+        keys["minus"] = False
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT: # 게임끄기
@@ -747,11 +967,11 @@ def play_game():
             if event.type == pygame.KEYDOWN: 
                 
                 keys["up"] = event.key == pygame.K_KP8
-                keys["down"] = event.key == pygame.K_KP5
+                keys["down"] = event.key == pygame.K_KP5 or event.key == pygame.K_KP2
                 keys["left"] = event.key == pygame.K_KP4 
                 keys["right"] = event.key == pygame.K_KP6  
                 keys["enter"] = event.key == pygame.K_KP_ENTER
-                keys["back"] = event.key == pygame.K_KP_PERIOD
+                keys["back"] = event.key == pygame.K_KP_PERIOD or event.key == pygame.K_BACKSPACE
                 keys["0"] = event.key == pygame.K_KP0
                 keys["1"] = event.key == pygame.K_KP1
                 keys["2"] = event.key == pygame.K_KP2
@@ -762,9 +982,11 @@ def play_game():
                 keys["7"] = event.key == pygame.K_KP7
                 keys["8"] = event.key == pygame.K_KP8
                 keys["9"] = event.key == pygame.K_KP9
+                keys["minus"] = event.key == pygame.K_KP_MINUS
                 if event.key == K_F4: setFullScreen()
 
         if(menuAble):
+
             if curMenu == "Upper":
                 if keys["left"]:
                     curMenu = "Main"
@@ -852,16 +1074,25 @@ def play_game():
         if game_start and not loading: 
 
             #region 화면전환
+            if(count == 0):   menuAble = False
             count += 1
+            if(count < 160):
+                bgx += 1
+            if(count == 1):
+                battleManager.player.idlespd =5
             if(count == 60):
-                menuAble = True
                 print("적 출현!")
+            if(count == 120):               
                 battleManager.enemys.append(copy(stage1.enemys[rndNum(0,2)]))
                 battleManager.enemys.append(copy(stage1.enemys[rndNum(0,2)]))
                 print(battleManager.enemys[0].name)
                 if len(battleManager.enemys) == 2:
-                    battleManager.enemys[0].changeSavePos(806)
-                    battleManager.enemys[1].changeSavePos(1006)
+                    battleManager.enemys[0].setMove(706,10)
+                    battleManager.enemys[1].setMove(906,10)
+            if(count == 160):
+                battleManager.player.idlespd =50
+                menuAble = True
+
             if(len(battleManager.player_WeaponSlot) >= game_player.behavior and not battleStart):
                 if keys["enter"]: 
                     battleManager.battleStart = True
@@ -875,6 +1106,7 @@ def play_game():
                 if(len(battleManager.enemys) <= 0):
                     menuAble = False
                     battleManager.battleStart = False
+                    mainCurser = 0
                     count = 0
 
 
@@ -1003,22 +1235,28 @@ def play_game():
         
         #region 전투중일때 그리기
         if(battleManager.battleStart):
-            draw_rect_alpha(screen,(255,0,0,100),Rect(0,0,1080,720))
+            
             battleManager.battle_Chain[0].draw(battleMenu_render)
             screen.blit(battleMenu_render,(0,0))
         #endregion
 
         #region 메뉴,바닥,배경 그리기 
+
+        if(len(background_list) > 0):
+            for img in background_list:
+                img.draw(bgx)  
+            
              
         screen.blit(menu,(0,0))
         screen.blit(menu_render,(30,30))
-        screen.blit(floor,(0,HEIGHT-225))
 
-        progressBar.draw(screen)
-        #region 전투중일때 그리기
-        if(battleManager.battleStart):
+
+        if(battleManager.battleStart):            
+            draw_rect_alpha(screen,(0,0,0,100),Rect(0,0,1080,720))
+        progressBar.draw(screen)     
+        if(battleManager.battleStart):            
             screen.blit(battleMenu_render,(0,0))
-        #endregion
+        
         #endregion
         
         #region 캐릭터, 적 그리기
@@ -1085,10 +1323,7 @@ def gameStart():
     menuAble = True
     battleManager.player = game_player
 
-def draw_rect_alpha(surface, color, rect):
-    shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
-    pygame.draw.rect(shape_surf, color, shape_surf.get_rect())
-    surface.blit(shape_surf, rect)
+
 
 def setFullScreen():
     global screen
@@ -1099,8 +1334,19 @@ def setFullScreen():
     else:
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
     
+def bigLeftChange(a,b):
+    var1 = a
+    var2 = b
+    if var2 > var1:
+        aaa = var2
+        var2 = var1
+        var1 = aaa
+    return var1, var2
+
 def rndNum(min,max):
     return random.randrange(min,max+1)
+def rndTup(value):
+    return random.randrange(value[0],value[1]+1)
 
 def mixList(origin_list):
     origin = copy(origin_list)
