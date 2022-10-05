@@ -9,7 +9,7 @@ import time
 from re import A
 from turtle import down
 from cv2 import transform
-from numpy import block, full, number
+from numpy import block, full, number, save
 from copy import copy
 
 import pygame
@@ -94,16 +94,48 @@ damageFont = pygame.font.Font("resource\Font\SEBANG Gothic.ttf", 15)
 
 
 
-def convertImage(surface,x,y,w,h):
+def convertImage(surface,x,y,w,h,multi=5):
     image = pygame.Surface((w, h), pygame.SRCALPHA)
     image.blit(surface, (0,0), Rect(x,y,w,h))
-    image = pygame.transform.scale(image,(w*5,h*5))
+    image = pygame.transform.scale(image,(w*multi,h*multi))
     return image
 
 def draw_rect_alpha(surface, color, rect):
     shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
     pygame.draw.rect(shape_surf, color, shape_surf.get_rect())
     surface.blit(shape_surf, rect)
+
+def setFullScreen():
+    global screen
+    global fullscreen
+    fullscreen = not fullscreen
+    if fullscreen:
+        screen = pygame.display.set_mode(monitor_size, pygame.FULLSCREEN|pygame.SCALED)
+    else:
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    
+def bigLeftChange(a,b):
+    var1 = a
+    var2 = b
+    if var2 > var1:
+        aaa = var2
+        var2 = var1
+        var1 = aaa
+    return var1, var2
+
+def rndNum(min,max):
+    return random.randrange(min,max+1)
+def rndTup(value):
+    return random.randrange(value[0],value[1]+1)
+
+def mixList(origin_list):
+    origin = copy(origin_list)
+    rand_list = []
+    for i in range(0,len(origin)):
+        rnd = rndNum(0,len(origin)-1)
+        rand_list.append(origin[rnd])
+        del origin[rnd]
+    return rand_list
 
 
 class MainItem:
@@ -154,8 +186,23 @@ class MainItem:
 
 class Stage:
     def __init__(self,num,enemys = []):
+        self.index = -1
         self.num = num
         self.enemys = enemys
+        self.enemy_line = []
+        self.preSetStage()
+    def preSetStage(self):
+        if self.num == 1:
+            self.enemy_line = [
+                [self.enemys[0]],[self.enemys[1]],[self.enemys[2]],[self.enemys[rndNum(0,2)],self.enemys[rndNum(0,2)]],[self.enemys[3]],\
+                    [self.enemys[0]],[self.enemys[1]],[self.enemys[2]],[self.enemys[rndNum(0,2)],self.enemys[rndNum(0,2)]],[self.enemys[3]]
+            ]
+
+
+    def getEnemy(self):
+        self.index += 1
+        return self.enemy_line[self.index]
+
 
 class Num:
     def __init__(self, value=0):
@@ -198,6 +245,7 @@ class Weapon:
         if self.id == 1:
             self.rndList = [(1,9),(10,20),(60,100),(50,200)]
             self.dmgList = [1,2,4,8]
+
 
     def getWeapon(self):
         self.damage = 0
@@ -243,6 +291,7 @@ class Weapon:
                 question.append(Num(rnd))
                 question.append(Sim("+"))
                 b += rnd
+            del question[len(question)-1]
 
             question.append(Sim("="))
             question.append(Num(b))
@@ -265,6 +314,19 @@ class Weapon:
             question = [Num(a),Sim(sim),Num(b),Sim("="),Num(c)]
             answer = [rndNum(0,1)*2]
             return question, answer
+
+
+
+
+
+
+
+
+
+
+
+
+
     def levelRndNum(self):
         rndNum(1,9)
 
@@ -284,9 +346,16 @@ class Item:
         self.name = name        
         self.message = message
         self.icon = icon
+        self.equip = False
     def active(self):
         if(self.id == 1):
             battleManager.player.health += 5
+            battleManager.player.item.remove(self)
+        if(self.id == 2):
+            self.equip = True
+    def equip_active(self,weapon):
+        if self.id == 2:
+            weapon.levelUp()
         battleManager.player.item.remove(self)
 
 
@@ -484,6 +553,15 @@ class BattleManager:
         self.battlePre = False
         self.count = 0
 
+        self.stage1 = Stage(1,[enemys["새새색"],enemys["배애앰"],enemys["장난질"],enemys["직각"],enemys["마르"]])
+        # self.stage2 = Stage(2,[enemys["새새색"],enemys["배애앰"],enemys["장난질"]])
+        # self.stage3 = Stage(3,[enemys["새새색"],enemys["배애앰"],enemys["장난질"]])
+        self.curStage = self.stage1
+
+        self.item_get = False
+        self.randItems = []
+        self.itemEquip = False
+
     def addPlayerWeaponSlot(self,weapon):
         self.player_WeaponSlot.append(Battle(self.player,weapon))
 
@@ -513,6 +591,18 @@ class BattleManager:
         self.count += 1
         self.battle_Chain[0].update(game_player,self.enemys)
         progressBar.updateProgress(self.battle_Chain,self.battle_Chain_max)
+
+    def setEnemys(self):
+        for index in self.curStage.getEnemy():
+            self.enemys.append(copy(index))
+
+    def suffleItem(self):
+        self.randItems = []
+        self.randItems.append(copy(items["간식"]))
+        self.randItems.append(copy(weapons["마너스검"]))
+        self.randItems.append(copy(weapons["쪼기"]))
+        self.randItems.append(copy(weapons["부메랑"]))
+        
 
 class Battle:
     def __init__(self,attack,weapon):
@@ -801,21 +891,25 @@ keys = {
 }
 
 weapons = { 
-    "플러스검": Weapon("플러스검",1, convertImage(spr_mainChar1[0],64,0,32,32)),
-    "마너스검": Weapon("마너스검",2, convertImage(spr_mainChar1[1],64,0,32,32)),
-    "쪼기": Weapon("쪼기",3,convertImage(spr_char1[0],64,0,32,32)),
-    "뱀꼬리": Weapon("뱀꼬리",4,convertImage(spr_char1[1],64,0,32,32)),
-    "부메랑": Weapon("부메랑",5,convertImage(spr_char1[2],64,0,32,32))
+    "플러스검": Weapon("플러스검",1, convertImage(spr_mainChar1[0],64,0,32,32,4)),
+    "마너스검": Weapon("마너스검",2, convertImage(spr_mainChar1[1],64,0,32,32,4)),
+    "쪼기": Weapon("쪼기",3,convertImage(spr_char1[0],64,0,32,32,4)),
+    "뱀꼬리": Weapon("뱀꼬리",4,convertImage(spr_char1[1],64,0,32,32,4)),
+    "부메랑": Weapon("부메랑",5,convertImage(spr_char1[2],64,0,32,32,4)),
+    "구구단검": Weapon("구구단검",6,convertImage(spr_mainChar1[2],64,0,32,32,4)),
+    "나누창": Weapon("나누창",7,convertImage(spr_mainChar1[3],64,0,32,32,4))
 }
 
 items = {
-    "간식": Item("간식",1)
+    "간식": Item("간식",2)
 }
 
 enemys = {
-    "새새색": Enemy("새새색",spr_char1[0],4,weapons["쪼기"]),
-    "배애앰": Enemy("배애앰",spr_char1[1],4,weapons["뱀꼬리"]),
-    "장난질": Enemy("장난질",spr_char1[2],5,weapons["부메랑"])
+    "새새색": Enemy("새새색",spr_char1[0],1,weapons["쪼기"]),
+    "배애앰": Enemy("배애앰",spr_char1[1],10,weapons["뱀꼬리"]),
+    "장난질": Enemy("장난질",spr_char1[2],12,weapons["부메랑"]),
+    "직각": Enemy("직각",spr_mainChar1[2],30,weapons["구구단검"]),
+    "마르": Enemy("마르",spr_mainChar1[3],30,weapons["나누창"])
 }
 
 #region 메뉴관련 변수들
@@ -868,11 +962,8 @@ game_player = player_tri
 game_lobby = True
 game_start = False
 
-stage1 = Stage(1,[enemys["새새색"],enemys["배애앰"],enemys["장난질"]])
-
 
 def play_game():
-    print(mixList([1,2,3,4,56]))
     #region 기초 변수 초기화
 
     #region 기본변수
@@ -901,8 +992,7 @@ def play_game():
 
     menuAble = False
 
-    curStage = stage1
-
+    save_upper = 0
     battleStart = False
     #endregion
 
@@ -992,8 +1082,25 @@ def play_game():
                     curMenu = "Main"
                     render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
                     render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
+                    if battleManager.itemEquip: battleManager.itemEquip = False
                 if keys["right"]:
-                    upperItems[upperCurser].active() # 아이템 발동
+                    if battleManager.item_get:
+                        if(upperItems[upperCurser].__class__.__name__ == "Weapon"):
+                            battleManager.player.giveWeapon(upperItems[upperCurser])
+                        elif(upperItems[upperCurser].__class__.__name__ == "Item"):
+                            battleManager.player.giveItem(upperItems[upperCurser])
+                        upperItems = battleManager.player.weapon
+                        battleManager.item_get = False
+                    elif battleManager.itemEquip:
+                        downerItems[downerCurser].equip_active(upperItems[upperCurser])
+                        battleManager.itemEquip = False
+                        curMenu = "Downer"
+                        mainCurser = 1
+                        if(len(downerItems) <=0):
+                            curMenu = "Main"
+
+                    else:
+                        upperItems[upperCurser].active() # 아이템 발동
                 if keys["up"]:
                     upperCurser -= 1
                     if upperCurser < 0: upperCurser = len(upperItems)-1
@@ -1004,13 +1111,17 @@ def play_game():
                     if upperCurser >= len(upperItems): upperCurser = 0
                     render_message = upperItems[upperCurser].message
                     render_icon = upperItems[upperCurser].icon
-            if curMenu == "Downer":
+            elif curMenu == "Downer":
                 if keys["left"]:
                     curMenu = "Main"
                     render_message = mainDownVisual["message"] if mainCurser == 1 else mainUpVisual["message"]
                     render_icon = mainDownVisual["icon"] if mainCurser == 1 else mainUpVisual["icon"]
                 if keys["right"]:
                     downerItems[downerCurser].active() # 아이템 발동
+                    if downerItems[downerCurser].equip:
+                        battleManager.itemEquip = True
+                    if(len(downerItems) <= 0):
+                        curMenu = "Main"
                     
                 if keys["up"]:
                     downerCurser -= 1
@@ -1022,7 +1133,7 @@ def play_game():
                     if downerCurser >= len(downerItems): downerCurser = 0
                     render_message = downerItems[downerCurser].message
                     render_icon = downerItems[downerCurser].icon
-            if curMenu == "Main":
+            elif curMenu == "Main":
                 if keys["right"]:
                     if(mainCurser == 0 and len(upperItems) > 0):
                         curMenu = "Upper"
@@ -1072,42 +1183,66 @@ def play_game():
         
         #region 게임
         if game_start and not loading: 
-
             #region 화면전환
-            if(count == 0):   menuAble = False
-            count += 1
+            if(count == 0):   
+                menuAble = False
             if(count < 160):
                 bgx += 1
+                count += 1
             if(count == 1):
                 battleManager.player.idlespd =5
             if(count == 60):
                 print("적 출현!")
-            if(count == 120):               
-                battleManager.enemys.append(copy(stage1.enemys[rndNum(0,2)]))
-                battleManager.enemys.append(copy(stage1.enemys[rndNum(0,2)]))
-                print(battleManager.enemys[0].name)
+            if(count == 120):          
+                battleManager.setEnemys()
+                if len(battleManager.enemys) == 1:
+                    battleManager.enemys[0].setMove(806,10)
                 if len(battleManager.enemys) == 2:
                     battleManager.enemys[0].setMove(706,10)
                     battleManager.enemys[1].setMove(906,10)
+                if len(battleManager.enemys) == 3:
+                    battleManager.enemys[0].setMove(606,10)
+                    battleManager.enemys[1].setMove(806,10)
+                    battleManager.enemys[2].setMove(1006,10)
             if(count == 160):
                 battleManager.player.idlespd =50
                 menuAble = True
+                if battleManager.itemEquip:
+                    print("doing")
+                    curMenu = "Upper"
+                    upperCurser = 0
+                    mainCurser = 0
 
             if(len(battleManager.player_WeaponSlot) >= game_player.behavior and not battleStart):
-                if keys["enter"]: 
+                if keys["enter"]: # 커맨드 모두 입력시
                     battleManager.battleStart = True
                     progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
                 if keys["back"]: 
                     battleManager.player_WeaponSlot = []
                     progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
             
-            if(battleManager.battleStart):
+            if(battleManager.battleStart): 
                 battleManager.battle()
-                if(len(battleManager.enemys) <= 0):
-                    menuAble = False
+                if(len(battleManager.enemys) <= 0): # 적이 없을시
+                    battleManager.item_get = True
                     battleManager.battleStart = False
                     mainCurser = 0
-                    count = 0
+                    save_upper = upperCurser
+                    # count = 0
+
+            if(battleManager.item_get):
+                if count == 160:
+                    battleManager.suffleItem()
+                    upperItems = battleManager.randItems
+                count += 1
+                curMenu = "Upper"
+
+            if(not battleManager.item_get and count > 160):
+                count = 0
+                upperCurser = save_upper
+                menuAble = False
+                curMenu = "Main"
+
 
 
 
@@ -1325,37 +1460,7 @@ def gameStart():
 
 
 
-def setFullScreen():
-    global screen
-    global fullscreen
-    fullscreen = not fullscreen
-    if fullscreen:
-        screen = pygame.display.set_mode(monitor_size, pygame.FULLSCREEN|pygame.SCALED)
-    else:
-        screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    
-def bigLeftChange(a,b):
-    var1 = a
-    var2 = b
-    if var2 > var1:
-        aaa = var2
-        var2 = var1
-        var1 = aaa
-    return var1, var2
 
-def rndNum(min,max):
-    return random.randrange(min,max+1)
-def rndTup(value):
-    return random.randrange(value[0],value[1]+1)
-
-def mixList(origin_list):
-    origin = copy(origin_list)
-    rand_list = []
-    for i in range(0,len(origin)):
-        rnd = rndNum(0,len(origin)-1)
-        rand_list.append(origin[rnd])
-        del origin[rnd]
-    return rand_list
 
 
 
