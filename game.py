@@ -1,4 +1,4 @@
-
+from fractions import Fraction
 from glob import glob
 from json import load
 import math
@@ -11,7 +11,7 @@ from re import A
 from turtle import down
 from cv2 import transform
 from numpy import block, full, number, save
-from copy import copy
+from copy import copy, deepcopy
 
 import pygame
 from pip import main
@@ -192,6 +192,23 @@ def mixList(origin_list):
 def className(object,string):
     return object.__class__.__name__ == string
 
+def renderFraction(font,value,color=(255,255,255)):
+    text = value.split('/')
+    text1 = text[0]
+    try:
+        text2 = text[1]
+    except: text2 = ""
+    text1_suf = font.render(text1,True,color)
+    text1_rect = text1_suf.get_rect()
+    text2_suf = font.render(text2,True,color)
+    text2_rect = text2_suf.get_rect()
+    bigx = text1_rect.width if text1_rect.width > text2_rect.width else text2_rect.width
+    text_surface = pygame.Surface((bigx,100), SRCALPHA)
+    text_surface.blit(text1_suf,(0,50))
+    text_surface.blit(text2_suf,(0,0))
+    pygame.draw.rect(text_surface, color, Rect(0,50,80,4))
+    return text_surface
+
 class LobbyItem:
     def __init__(self,name, message=[""], icon=pygame.Surface((16,16))):
         self.text = name
@@ -219,10 +236,13 @@ class MainItem:
             global player_tri
             game_player = player_tri if game_player == player_rect else player_rect
         if(self.num == 2):
+            battleManager.difficulty = "Easy"
             gameStart()
         if(self.num == 3):
+            battleManager.difficulty = "Normal"
             gameStart()
         if(self.num == 4):
+            battleManager.difficulty = "Hard"
             gameStart()
 
         if(self.num == 5):
@@ -266,19 +286,31 @@ class Num:
 class Sim:
     def __init__(self, value="+"):
         self.value = value
-        self.text = str(value)
+        self.text = value
+class Frac:
+    def __init__(self,value=0,value2=0):
+        self.value = Fraction(value2,value)    
+        self.text = str(self.value)
+        text = self.text.split('/')
+        text1 = text[0]
+        text2 = ""
+        try:
+            text2 = text[1]
+            self.text = text2 +"/"+text1
+        except: 
+            self.text = text1
 
 class Weapon:
-    def __init__(self,name,id,icon=pygame.Surface((16,16)),level=0,lvUpList = [2,4,8,16,32], message=[""]):
+    def __init__(self,name,id,icon=pygame.Surface((16,16)),time = 5, message=[""],lvUpList = [2,4,8,16,32]):
         self.tag = "Weapon"
         self.id = id 
-        self.count = level
+        self.count = 0
         
         self.exp = 0
         self.max_exp = 0
         self.lvUpList = lvUpList
         self.lvUpList.append(999)
-        self.time = 300
+        self.time = time*60
         self.max_time = self.time
 
         self.name = name        
@@ -297,9 +329,9 @@ class Weapon:
 
     def active(self):
         global battleManager
-        if(len(battleManager.player_WeaponSlot) < game_player.behavior):
+        if(len(battleManager.player_WeaponSlot) < game_player.speed):
             battleManager.addPlayerWeaponSlot(self)
-            progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
+            progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.speed)
     def preSetWeapon(self):
         if self.id == 1:
             self.rndList = [(1,9),(10,20),(30,70),(50,100),(100,500),(500,1000)]
@@ -325,20 +357,20 @@ class Weapon:
     def getWeapon(self):
         question = []
         answer = []
-        if self.id == 1:
+        if self.id == 1: # 삼각
             a = rndTup(self.rndList[self.count])
             b = rndTup(self.rndList2[self.count])
             c = a + b
             question = [Num(a),Sim("+"),Num(b),Sim("="),Num(c)]
             answer = [4]
-        if self.id == 2:
+        if self.id == 2: # 지사
             a = rndTup(self.rndList[self.count])
             b = rndTup(self.rndList2[self.count])
             a,b = bigLeftChange(a,b)
             c = a - b
             question = [Num(a),Sim("-"),Num(b),Sim("="),Num(c)]
             answer = [4]
-        if self.id == 3:
+        if self.id == 3: # 새새색
             a = rndNum(1,9)
             b = rndNum(1,9)
             rnd = rndNum(0,1)
@@ -352,7 +384,7 @@ class Weapon:
                 sim = "-"  
             question = [Num(a),Sim(sim),Num(b),Sim("="),Num(c)]
             answer = [4]
-        if self.id == 4:
+        if self.id == 4: # 배애앰
             randa = rndNum(3,6)
             b = 0
             question = []
@@ -367,7 +399,7 @@ class Weapon:
             question.append(Num(b))
 
             answer = [len(question)-1]
-        if self.id == 5:
+        if self.id == 5: # 장난질
             a = rndNum(1,9)
             b = rndNum(1,9)
             rnd = rndNum(0,1)
@@ -381,38 +413,173 @@ class Weapon:
                 sim = "-"  
             question = [Num(a),Sim(sim),Num(b),Sim("="),Num(c)]
             answer = [rndNum(0,1)*2]
-        if self.id == 6:
+        if self.id == 6: # 직각
             a = rndTup(self.rndList[self.count])
             b = rndTup(self.rndList2[self.count]) 
             c = a * b
             question = [Num(a),Sim("×"),Num(b),Sim("="),Num(c)]  
             answer = [4]   
-        if self.id == 7:
+        if self.id == 7: # 마르
             a = rndTup(self.rndList[self.count])
             b = rndTup(self.rndList2[self.count]) 
             c = a * b
             question = [Num(c),Sim("÷"),Num(b),Sim("="),Num(a)]  
             answer = [4]  
-        
+        if self.id == 8: # 스피릿
+            a = rndTup(self.rndList[self.count])
+            b = rndTup(self.rndList[self.count])
+            c = rndTup(self.rndList[self.count])
+            d = rndTup(self.rndList[self.count])
+            sum = 0
+            question.append(Num(a))
+            if(rndNum(0,1) == 0):
+                question.append(Sim("+"))
+                question.append(Num(b))
+                sum = a + b
+            else:
+                question.append(Sim("-"))
+                question.append(Num(b))
+                sum = a - b
+            if(rndNum(0,1) == 0):
+                question.append(Sim("+"))
+                question.append(Num(c))
+                sum += c
+            else:
+                question.append(Sim("-"))
+                question.append(Num(b))
+                sum -= c
+            if(rndNum(0,1) == 0):
+                question.append(Sim("+"))
+                question.append(Num(d))
+                sum += d
+            else:
+                question.append(Sim("-"))
+                question.append(Num(d))
+                sum -= d
+            question.append(Sim("="))
+            question.append(Num(sum))
+            answer = [len(question)-1]
+        if self.id == 9:
+            a = rndTup(self.rndList[self.count])
+            b = rndTup(self.rndList[self.count])
+            c = rndTup(self.rndList[self.count])
+            x = a*(b+c)
+            question = [Num(a),Sim("×"),Sim("("),Num(b),Sim("+"),Num(c),Sim(")"),Sim("="),Num(x)]
+            answer = [len(question)-1]
+        if self.id == 10:
+            a = rndTup(self.rndList[self.count])
+            b = rndTup(self.rndList[self.count])
+            c = rndTup(self.rndList[self.count])
+            x = a*b/b
+            question = [Num(a*b),Sim("÷"),Num(b),Sim("-"),Num(c),Sim("="),Num(a-c)]
+            answer = [len(question)-1]  
+        if self.id == 11:
+            enemy = battleManager.battle_Chain[0].attack
+            if enemy.save_count == 0:
+                enemy.save_var = rndNum(2,5)
+            a = rndNum(2,9)
+            multi = enemy.save_var * a
+            question = [Num(enemy.save_var),Sim("×"),Num(a),Sim("="),Num(multi)]
+            answer = [len(question)-1]  
+            enemy.save_var = multi
+            enemy.save_count += 1
+            if enemy.save_count >= 4:
+                enemy.save_count = 0
+                enemy.save_var = 0
+        if self.id == 12:
+            a = rndNum(2,5)
+            sum = a
+            question.append(Num(a))
+            multi_time = rndNum(0,2)
+            for i in range(0,3):
+                if(rndNum(0,1) == 0):
+                    question.append(Sim("+"))
+                    question.append(Num(a))
+                    if(multi_time == i):
+                        question.append(Sim("×"))
+                        question.append(Num(a))
+                        sum += a*a
+                    else:
+                        sum += a 
+                else:
+                    question.append(Sim("-"))
+                    question.append(Num(a))
+                    if(multi_time == i):
+                        question.append(Sim("×"))
+                        question.append(Num(a))
+                        sum -= a*a
+                    else:
+                        sum -= a 
+
+            question.append(Sim("="))
+            question.append(Num(sum))
+            print(question[len(question)-1].value)
+            answer = [len(question)-1]  
+        if self.id == 13:
+            a = rndNum(2,9)
+            b = rndNum(2,4)
+            c = rndNum(1,3)
+
+            x = b
+            y = a*b - c
+            question = [Num(a),Sim("-"),Frac(b,c),Sim("="),Frac(x,y)]
+            answer = [len(question)-1]
+        if self.id == 14:
+            a = rndNum(2,5)
+            b = rndNum(2,5)
+            c = rndNum(1,4)
+            d = rndNum(1,4)
+
+            a1 = Fraction(c,a) + Fraction(d,b)
+
+            x = a1.denominator
+            y = a1.numerator
+            question = [Frac(a,c),Sim("+"),Frac(b,d),Sim("="),Frac(x,y)]
+            answer = [len(question)-1]
+        if self.id == 15:
+            a = rndNum(2,5)
+            b = rndNum(2,5)
+            c = rndNum(1,4)
+            d = rndNum(1,4)
+
+            a1 = Fraction(c,a) * Fraction(d,b)
+
+            x = a1.denominator
+            y = a1.numerator
+            question = [Frac(a,c),Sim("×"),Frac(b,d),Sim("="),Frac(x,y)]
+            answer = [len(question)-1]
+        if self.id == 16:
+            a = rndNum(10,50) * 10
+            b = rndNum(10,90)
+            a1 = a * Fraction(b,100)
+
+            x = a1.denominator
+            y = a1.numerator
+            question = [Num(a),Sim("의"),Num(b),Sim("%"),Sim("="),Frac(x,y)]
+            answer = [len(question)-1]
+        if self.id == 17:
+            add_list = []
+            for i in range(0,4):
+                add_list.append(rndNum(5,20)) 
+            sum = 0
+            for i in add_list:
+                question.append(Num(i))
+                question.append(Sim(", "))
+                sum += i
+            del question[len(question)-1]
+            question.append(Sim("--평균값-->"))
+
+            a1 = Fraction(len(add_list),sum)
+            
+
+            x = a1.denominator
+            y = a1.numerator
+            question.append(Frac(y,x))
+            answer = [len(question)-1]
+
+
         
         return question, answer 
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def levelRndNum(self):
-        rndNum(1,9)
 
     def levelUp(self):
         self.exp = 0
@@ -470,7 +637,7 @@ class Player:
         self.max_health = self.health
         self.weapon = []
         self.item = []
-        self.behavior = 3
+        self.speed = 3
         self.time_beul = 3
 
         self.condition = 0
@@ -570,6 +737,8 @@ class Enemy:
         self.weapon = copy(weapon)
         self.speed = spd
         self.item = []
+        self.save_var = 0
+        self.save_count = 0
 
         self.condition = 0
         self.idle1 = convertImage(self.sprite,0,0,32,32)
@@ -645,49 +814,94 @@ class Enemy:
         self.move_point = pos
         self.saved_pos = pos
 
-    def setlevel(self,level,spd,health):
-        self.count = level
-        self.speed += spd
-        self.max_health *= health
-        self.health = self.max_health
-
 class Stage:
     def __init__(self,num,enemys = []):
         self.index = -1
         self.num = num
         self.enemys = enemys
         self.enemy_line = []
+
+        self.easy_preset = [
+            [self.enemys[0],0.5,0],\
+            [self.enemys[1],0.5,0],\
+            [self.enemys[2],0.5,0],\
+            [self.enemys[rndNum(0,2)],0.5,0],\
+            [self.enemys[rndNum(0,2)],0.5,0],\
+            [self.enemys[3],0.5,0],\
+            [self.enemys[rndNum(0,1)],1,0],\
+            [self.enemys[rndNum(0,1)],0.5,0],\
+            [self.enemys[rndNum(0,1)],1,0],\
+            [self.enemys[2],1,0],\
+            [self.enemys[0],1,1],\
+            [self.enemys[1],1,1],\
+            [self.enemys[2],2,1],\
+            [self.enemys[rndNum(0,1)],2,1],\
+            [self.enemys[rndNum(0,2)],2,1],\
+            [self.enemys[rndNum(1,2)],2,1],\
+            [self.enemys[4],3,2]
+        ]
+        self.normal_preset = [
+            [self.enemys[0],1,0],\
+            [self.enemys[1],1,0],\
+            [self.enemys[2],1,0],\
+            [self.enemys[rndNum(0,2)],1,1],\
+            [self.enemys[rndNum(0,2)],1,0],\
+            [self.enemys[3],1,0],\
+            [self.enemys[rndNum(0,1)],2,1],\
+            [self.enemys[rndNum(0,1)],1,0],\
+            [self.enemys[rndNum(0,1)],2,1],\
+            [self.enemys[2],2,1],\
+            [self.enemys[0],2,2],\
+            [self.enemys[1],2,2],\
+            [self.enemys[2],2,2],\
+            [self.enemys[rndNum(0,1)],2,2],\
+            [self.enemys[rndNum(0,2)],3,2],\
+            [self.enemys[rndNum(1,2)],2,2],\
+            [self.enemys[4],4,3]
+        ]
+        self.hard_preset = [
+            [self.enemys[0],1,1],\
+            [self.enemys[1],1,1],\
+            [self.enemys[2],1,1],\
+            [self.enemys[rndNum(0,2)],1,2],\
+            [self.enemys[rndNum(0,2)],1,1],\
+            [self.enemys[3],1,1],\
+            [self.enemys[rndNum(0,1)],2,2],\
+            [self.enemys[rndNum(0,1)],1,1],\
+            [self.enemys[rndNum(0,1)],2,2],\
+            [self.enemys[2],2,2],\
+            [self.enemys[0],2,3],\
+            [self.enemys[1],2,3],\
+            [self.enemys[2],2,3],\
+            [self.enemys[rndNum(0,1)],2,4],\
+            [self.enemys[rndNum(0,2)],3,4],\
+            [self.enemys[rndNum(1,2)],2,4],\
+            [self.enemys[4],4,5]
+        ]
+
         try:self.preSetStage()
         except:pass
     def preSetStage(self):
         global game_player
-        if battleManager.player.name == "삼각":
-            self.enemy_line = [
-                [copy(self.enemys[0])],[copy(self.enemys[1])],[copy(self.enemys[2])],[copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])],[copy(self.enemys[3])],\
-                    [copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])],[copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])]\
-                        ,[copy(self.enemys[rndNum(0,1)]),copy(self.enemys[rndNum(0,1)]),copy(self.enemys[2])],[copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])],[self.enemys[4]]
-            ]
+        enemyGroup = []
+        pe = []
+        if battleManager.difficulty == "Easy": enemyGroup = self.easy_preset
+        elif battleManager.difficulty == "Normal": enemyGroup = self.normal_preset
+        elif battleManager.difficulty == "Hard": enemyGroup = self.hard_preset
+        for index in enemyGroup:
+            enemy = copy(index[0])
+            enemy.weapon = copy(index[0].weapon)
+            enemy.max_health = int(enemy.max_health * index[1])
+            enemy.health = enemy.max_health
+            enemy.weapon.count = index[2]
+            pe.append(enemy)
+        if game_player.name == "삼각":
+            self.enemy_line = [[pe[0]],[pe[1]],[pe[2]],[pe[3],pe[4]],[pe[5]],[pe[6],pe[7]],[pe[8],pe[9]],[pe[10],pe[11],pe[12]],[pe[13],pe[14],pe[15]],[pe[16]]]
+        else:
+            self.enemy_line = [[pe[0]],[pe[1]],[pe[2]],[pe[3],pe[4]],[pe[16]],[pe[6],pe[7]],[pe[8],pe[9]],[pe[10],pe[11],pe[12]],[pe[13],pe[14],pe[15]],[pe[5]]]
+
             
-        if battleManager.player.name == "지사":
-            self.enemy_line = [
-                [copy(self.enemys[0])],[copy(self.enemys[1])],[copy(self.enemys[2])],[copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])],[self.enemys[4]],\
-                    [copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])],[copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])]\
-                        ,[copy(self.enemys[rndNum(0,1)]),copy(self.enemys[rndNum(0,1)]),copy(self.enemys[2])],[copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)]),copy(self.enemys[rndNum(0,2)])],[copy(self.enemys[3])]
-            ]
-        self.enemy_line[3][0].setlevel(1,0,2)
-        self.enemy_line[3][1].setlevel(1,0,2)
-        self.enemy_line[4][0].setlevel(2,0,1)
-        self.enemy_line[5][0].setlevel(2,1,2)
-        self.enemy_line[5][1].setlevel(2,1,2)
-        self.enemy_line[6][0].setlevel(3,1,2)
-        self.enemy_line[6][1].setlevel(3,1,3)
-        self.enemy_line[7][0].setlevel(1,2,3)
-        self.enemy_line[7][1].setlevel(3,2,2)
-        self.enemy_line[7][2].setlevel(2,2,3)
-        self.enemy_line[8][0].setlevel(3,2,4)
-        self.enemy_line[8][1].setlevel(4,2,3)
-        self.enemy_line[8][2].setlevel(2,2,2)
-        self.enemy_line[9][0].setlevel(5,3,5)
+
     def getEnemy(self):
         self.index += 1
         return self.enemy_line[self.index]
@@ -696,6 +910,7 @@ class BattleManager:
     def __init__(self):
         self.player = Player()
         self.enemys = []
+        self.difficulty = "Normal"
 
         self.player_WeaponSlot = []
 
@@ -706,8 +921,8 @@ class BattleManager:
         self.battlePre = False
         self.count = 0
 
-        self.stage1 = Stage(1,[enemys["새새색"],enemys["배애앰"],enemys["장난질"],enemys["직각"],enemys["마르"]])
-        # self.stage2 = Stage(2,[enemys["새새색"],enemys["배애앰"],enemys["장난질"]])
+        # self.stage1 = Stage(1,[enemys["새새색"],enemys["배애앰"],enemys["장난질"],enemys["직각"],enemys["마르"]])
+        self.stage1 = Stage(2,[enemys["빅"],enemys["툣끼"],enemys["슬라임"],enemys["감마"],enemys["델타"]])
         # self.stage3 = Stage(3,[enemys["새새색"],enemys["배애앰"],enemys["장난질"]])
         self.curStage = self.stage1
 
@@ -804,7 +1019,7 @@ class Battle:
         knockback = 100
         if(self.input != "" and not self.delay and not self.failed): # 답 입력시
             if(len(str(self.question[self.answer[0]].value)) == len(self.input)):
-                if(self.question[self.answer[0]].value == int(self.input)):
+                if(self.question[self.answer[0]].text == self.input):
                     self.originWeapon.exp += 1
                     if self.originWeapon.exp >= self.originWeapon.max_exp: 
                         self.originWeapon.levelUp()
@@ -927,30 +1142,36 @@ class Battle:
         text_name = weaponFont.render(self.weapon.name,True,text_color)
         text_level = weaponFont.render("Lv " + str(self.weapon.count),True,text_color)
         text_time = weaponFont.render(str(math.ceil(self.weapon.time / 60)),True,text_color)
-        text_input = numberFont.render(self.input,True,(0,0,0))
+        text_input = numberFont.render(self.input,True,(0,0,0)) if not "/" in self.input else renderFraction(numberFont,self.input,(0,0,0))
 
         size = 0
-        for text in range(0,len(self.question)):            
-            text_num = numberFont.render(self.question[text].text,True,text_color)           
-            size += text_num.get_rect().width + ganguk
-        question_render = pygame.Surface((size,213), SRCALPHA)
+        for text in range(0,len(self.question)):   
+            if className(self.question[text],"Frac") and "/" in self.question[text].text:
+                text_num = renderFraction(numberFont,self.question[text].text)
+            else: text_num = numberFont.render(self.question[text].text,True,text_color)           
+            size += text_num.get_rect().width + ganguk # 간격 띄우기
+        question_render = pygame.Surface((size,213), SRCALPHA) # 질문의 상자를 만든다
+        
         x = 0
+        y = question_render.get_rect().centery
         for text in range(0,len(self.question)):            
-            text_num = numberFont.render(self.question[text].text,True,text_color)         
-            if(text in self.answer): 
+            if className(self.question[text],"Frac") and "/" in self.question[text].text:
+                text_num = renderFraction(numberFont,self.question[text].text)
+            else: text_num = numberFont.render(self.question[text].text,True,text_color)  
+            
+            if(text in self.answer and not self.failed): 
                 text_num.fill((255,255,255))  
-                text_num.blit(text_input,(0,0))
-
-            question_render.blit(text_num,(x,0))
+                text_num.blit(text_input,(0,0)) # 그 질문상자 위에 글을 또 써줌
+            dy = text_num.get_rect().centery
+            question_render.blit(text_num,(x,y-dy))
             x += text_num.get_rect().width + ganguk
-        board.blit(question_render,(207+410-size//2,112+86))
+        board.blit(question_render,(600-size//2,112)) # 가운데 정렬
 
         board.blit(self.weapon.icon,(16,16))
         board.blit(text_name,(263+40,27))
         board.blit(text_level,(151+40,27))
         board.blit(text_time,(41,351))
         pygame.draw.rect(board, (0,255,255) if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul else (255,255,255) , Rect(116,352,self.weapon.time/self.weapon.max_time*946,50), width=0)     
-
 
 
     def moveBack(self):
@@ -985,6 +1206,7 @@ class Battle:
         if keys["9"]: self.input += "9"
         if keys["back"]: self.input = ""
         if keys["minus"]: self.input += "-"
+        if keys["slice"]: self.input += "/"
 
 class ProgressBox:
     def __init__(self,var1=0,var2=0,color=(0,0,0)):
@@ -1103,7 +1325,8 @@ keys = {
     "7": False,
     "8": False,
     "9": False,
-    "minus": False
+    "minus": False,
+    "slice": False
 
 }
 
@@ -1114,7 +1337,17 @@ weapons = {
     "뱀꼬리": Weapon("뱀꼬리",4,convertImage(spr_char1[1],64,0,32,32,4)),
     "부메랑": Weapon("부메랑",5,convertImage(spr_char1[2],64,0,32,32,4)),
     "구구단검": Weapon("구구단검",6,convertImage(spr_mainChar1[2],64,0,32,32,4)),
-    "나누창": Weapon("나누창",7,convertImage(spr_mainChar1[3],64,0,32,32,4))
+    "나누창": Weapon("나누창",7,convertImage(spr_mainChar1[3],64,0,32,32,4)),
+    "마법가루": Weapon("마법가루",8,convertImage(spr_char1[3],64,0,32,32,4)),
+    "할퀴기": Weapon("할퀴기",9,convertImage(spr_char1[4],64,0,32,32,4)),
+    "점액발사": Weapon("점액발사",10,convertImage(spr_char1[5],64,0,32,32,4)),
+    "거듭베기": Weapon("거듭베기",11,convertImage(spr_mainChar1[5],64,0,32,32,4)),
+    "기호라이플": Weapon("기호라이플",12,convertImage(spr_mainChar1[6],64,0,32,32,4)),
+    "자여분": Weapon("자여분",13,convertImage(spr_char1[6],64,0,32,32,4)),
+    "분더분더": Weapon("분더분더",14,convertImage(spr_char1[6],64,0,32,32,4)),
+    "연사": Weapon("연사",15,convertImage(spr_char1[6],64,0,32,32,4)),
+    "백분율": Weapon("백분율",16,convertImage(spr_char1[6],64,0,32,32,4),10),
+    "평균값": Weapon("평균값",17,convertImage(spr_char1[6],64,0,32,32,4),10)
 }
 
 items = {
@@ -1126,9 +1359,19 @@ items = {
 enemys = {
     "새새색": Enemy("새새색",spr_char1[0],8,weapons["쪼기"],3),
     "배애앰": Enemy("배애앰",spr_char1[1],10,weapons["뱀꼬리"]),
-    "장난질": Enemy("장난질",spr_char1[2],12,weapons["부메랑"]),
-    "직각": Enemy("직각",spr_mainChar1[2],30,weapons["구구단검"],3),
-    "마르": Enemy("마르",spr_mainChar1[3],30,weapons["나누창"],3)
+    "장난질": Enemy("장난질",spr_char1[2],12,weapons["부메랑"],2),
+    "직각": Enemy("직각",spr_mainChar1[2],40,weapons["구구단검"],4),
+    "마르": Enemy("마르",spr_mainChar1[3],40,weapons["나누창"],4),
+    "스피릿": Enemy("스피릿",spr_char1[3],6,weapons["마법가루"],2),
+    "툣끼": Enemy("툣끼",spr_char1[4],12,weapons["할퀴기"],2),
+    "슬라임": Enemy("슬라임",spr_char1[5],15,weapons["점액발사"],2),
+    "감마": Enemy("감마",spr_mainChar1[5],60,weapons["기호라이플"],3),
+    "델타": Enemy("델타",spr_mainChar1[4],60,weapons["거듭베기"],4),
+    "오십퍼": Enemy("오십퍼",spr_char1[6],20,weapons["자여분"],3),
+    "영점오": Enemy("영점오",spr_char1[6],20,weapons["분더분더"],1),
+    "드론": Enemy("삐비삑",spr_char1[6],10,weapons["연사"],2),
+    "백": Enemy("백",spr_char1[6],100,weapons["백분율"],5),
+    "빅": Enemy("빅",spr_char1[6],100,weapons["평균값"],5)
 }
 
 stamps = {
@@ -1265,7 +1508,7 @@ def play_game():
     mainItems.append(LobbyItem("게임",["플러스워드","게임을 시작합니다","그리고 끔찍한 악몽이 시작됩니다"],menu_icon[0]))
     mainItems.append(LobbyItem("설정",["게임설정","게임을 시작합니다","그리고 끔찍한 악몽이 시작됩니다"],menu_icon[1]))
     upperItems = [MainItem(0,"매뉴얼",["수학으로 죽고사는 게임"],menu_icon[2]),MainItem(1,"캐릭터 설정",["수학으로 죽고사는 게임"],menu_icon[3]),\
-        MainItem(2,"쉬움",["수학으로 죽고사는 게임"],menu_icon[4]),MainItem(3,"보통",["수학으로 죽고사는 게임"],menu_icon[5]),MainItem(4,"어려움",["수학으로 죽고사는 게임"],menu_icon[6])]
+        MainItem(2,"보통",["보통난이도로 시작","왜 쉬움은 없냐고요?","세상에 수학이 쉬울순 없잖아요"],menu_icon[4]),MainItem(3,"어려움",["어려움난이도로 시작","뭐 이 게임에선 이게 보통 난이도 입니다","행운을 빕니다"],menu_icon[5]),MainItem(4,"컴퓨터",["컴퓨터 난이도로 시작","재미가 아닌이상","하지 맙시다"],menu_icon[6])]
     downerItems =  [MainItem(5,"배경음 ▲",["수학으로 죽고사는 게임"],menu_icon[7]),MainItem(6,"배경음 ▼",["수학으로 죽고사는 게임"],menu_icon[8]),\
         MainItem(7,"효과음 ▲",["수학으로 죽고사는 게임"],menu_icon[9]),MainItem(8,"효과음 ▼",["수학으로 죽고사는 게임"],menu_icon[10]),MainItem(9,"화면설정",["수학으로 죽고사는 게임"],menu_icon[11])]
 
@@ -1299,6 +1542,7 @@ def play_game():
         keys["8"] = False
         keys["9"] = False
         keys["minus"] = False
+        keys["slice"] = False
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT: # 게임끄기
@@ -1324,6 +1568,7 @@ def play_game():
                 keys["8"] = event.key == pygame.K_KP8
                 keys["9"] = event.key == pygame.K_KP9
                 keys["minus"] = event.key == pygame.K_KP_MINUS
+                keys["slice"] = event.key == pygame.K_KP_DIVIDE or event.key == pygame.K_RIGHT
                 if event.key == K_F4: setFullScreen()
 
         if(menuAble):
@@ -1466,13 +1711,13 @@ def play_game():
                     curMenu = "Upper"
                     mainCurser = 0
 
-            if(len(battleManager.player_WeaponSlot) >= game_player.behavior and not battleStart):
+            if(len(battleManager.player_WeaponSlot) >= game_player.speed and not battleStart):
                 if keys["enter"]: # 커맨드 모두 입력시
                     battleManager.battleStart = True
-                    progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
+                    progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.speed)
                 if keys["back"]: 
                     battleManager.player_WeaponSlot = []
-                    progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.behavior)
+                    progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.speed)
             
             if(battleManager.battleStart): 
                 battleManager.battle()
@@ -1611,6 +1856,9 @@ def play_game():
             selectbox.height = 75
         if(curMenu == "Downer"):
             a = downerCurser
+            if downerCurser >= len(downerItems):
+                downerCurser = len(downerItems)-1
+                a = downerCurser
             if(len(downerItems)>5):
                 if(downerCurser>len(downerItems)-3):
                     a = downerCurser - len(downerItems)+5
