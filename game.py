@@ -28,6 +28,7 @@ WIDTH = 1080
 HEIGHT = 720
 
 screen = pygame.display.set_mode((WIDTH,HEIGHT))
+half_screen = pygame.Surface((WIDTH//2,HEIGHT//2), SRCALPHA)
 menu_render = pygame.Surface((1020,360), SRCALPHA)
 battleMenu_render = pygame.Surface((1080,416), SRCALPHA)
 monitor_size = [pygame.display.Info().current_w, pygame.display.Info().current_h]
@@ -45,7 +46,6 @@ main_char1 = pygame.image.load('resource\Sprites\mainChar1.png').convert_alpha()
 char1 = pygame.image.load('resource\Sprites\char1.png').convert_alpha()
 char2 = pygame.image.load('resource\Sprites\char2.png').convert_alpha()
 menu = pygame.image.load('resource\Sprites\Menu.png').convert_alpha()
-floor = pygame.image.load('resource\Sprites\Floor.png').convert_alpha()
 others = pygame.image.load('resource\Sprites\others.png').convert_alpha()
 progress = pygame.image.load('resource\Sprites\Bar.png').convert_alpha()
 battleMenu = pygame.image.load('resource\Sprites\BattleMenu.png').convert_alpha()
@@ -57,7 +57,7 @@ pygame.image.load('resource\Sprites\stage1\land.png').convert_alpha()]
 #endregion
 #region PictureCutSave
 a_list = []
-for i in range (0,64,32):
+for i in range (0,128,32):
     for j in range (0,192,32):
         image = pygame.Surface((32, 32), pygame.SRCALPHA)
         image.blit(others, (0,0), Rect(j,i,32,32))
@@ -79,6 +79,24 @@ for i in range (0,256,128):
         a_list.append(image)
 spr_char1 = a_list
 
+#endregion
+#region SFXLoad
+s_Cursor = pygame.mixer.Sound('resource\SFX\Cursor1.wav')
+s_Decision = pygame.mixer.Sound('resource\SFX\Decision1.wav')
+s_Equip = pygame.mixer.Sound('resource\SFX\Equip1.wav')
+s_Flash = pygame.mixer.Sound('resource\SFX\Flash1.wav')
+s_Hammer = pygame.mixer.Sound('resource\SFX\Hammer.wav')
+s_Item = pygame.mixer.Sound('resource\SFX\Item3.wav')
+s_enep = pygame.mixer.Sound('resource\SFX\se_enep01.wav')
+s_kira = pygame.mixer.Sound('resource\SFX\se_kira00.wav')
+s_nice = pygame.mixer.Sound('resource\SFX\se_nice.wav')
+s_Sword = pygame.mixer.Sound('resource\SFX\Sword2.wav')
+s_noise = pygame.mixer.Sound('resource\SFX\se_noise.wav')
+s_itemGet = pygame.mixer.Sound('resource\SFX\se_cardget.wav')
+s_success1 = pygame.mixer.Sound('resource\SFX\se_bonus2.wav')
+s_success2 = pygame.mixer.Sound('resource\SFX\se_bonus4.wav')
+s_failed = pygame.mixer.Sound('resource\SFX\se_invalid.wav')
+s_input = pygame.mixer.Sound('resource\SFX\se_graze.wav')
 #endregion
 #region FontLoad
 menuFont = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 45)
@@ -107,6 +125,7 @@ game_setting[3] = int(setting_scroll[1])
 with open("setting.txt",'w',encoding="UTF-8") as f:
     f.write(str(game_setting[2])+"\n")
     f.write(str(game_setting[3])+"\n")
+
 #endregion
 #region
 cur_list = []
@@ -132,7 +151,7 @@ text_rect = text.get_rect()
 enemyAppearSprite.blit(text,(540-text_rect.centerx,10))
 bossAppearSprite = pygame.Surface((WIDTH,200), SRCALPHA)
 bossAppearSprite.fill((0,0,0,180))
-text = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 180).render("보스 출현!",True,(255,255,255))
+text = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 180).render("보스 출현!",True,(0,255,255))
 text_rect = text.get_rect()
 bossAppearSprite.blit(text,(540-text_rect.centerx,10))
 ItemAppearSprite = pygame.Surface((WIDTH,120), SRCALPHA)
@@ -140,7 +159,36 @@ ItemAppearSprite.fill((0,0,0,180))
 text = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 100).render("아이템 선택!",True,(255,255,255))
 text_rect = text.get_rect()
 ItemAppearSprite.blit(text,(540-text_rect.centerx,10))
+strongAppearSprite = pygame.Surface((WIDTH,200), SRCALPHA)
+strongAppearSprite.fill((0,0,0,180))
+text = pygame.font.Font("resource\Font\SEBANG Gothic Bold.ttf", 180).render("강적 출현!",True,(255,255,255))
+text_rect = text.get_rect()
+strongAppearSprite.blit(text,(540-text_rect.centerx,10))
 #endregion
+def music_and_sfx_volume(m,s):
+    try:s = s/100
+    except:s = 0
+    try:m = m/100
+    except:m = 0
+    pygame.mixer.music.set_volume(m)
+    s_Cursor.set_volume(s)
+    s_Decision.set_volume(s)
+    s_Equip.set_volume(s)
+    s_Flash.set_volume(s)
+    s_Hammer.set_volume(s)
+    s_enep.set_volume(s/4)
+    s_kira.set_volume(s)
+    s_nice.set_volume(s)
+    s_Sword.set_volume(s)
+    s_noise.set_volume(s)
+    s_Item.set_volume(s)
+    s_itemGet.set_volume(s)
+    s_success1.set_volume(s)
+    s_success2.set_volume(s)
+    s_failed.set_volume(s)
+    s_input.set_volume(s)
+music_and_sfx_volume(game_setting[2],game_setting[3])
+
 def updateSetting(a,b):
     with open("setting.txt",'w',encoding="UTF-8") as f:
         f.write(str(a)+"\n")
@@ -177,6 +225,10 @@ def bigLeftChange(a,b):
 
 def rndNum(min,max):
     return random.randrange(min,max+1)
+
+def randNum(min,max):
+    return random.randrange(min,max)
+
 def rndTup(value):
     return random.randrange(value[0],value[1]+1)
 
@@ -246,25 +298,33 @@ class MainItem:
             gameStart()
 
         if(self.num == 5):
+            s_Cursor.play()
             game_setting[2] += 5
             if(game_setting[2]>100): game_setting[2] = 100
             self.count = game_setting[2]
             updateSetting(game_setting[2],game_setting[3])
+            music_and_sfx_volume(game_setting[2],game_setting[3])
         if(self.num == 6):
+            s_Cursor.play()
             game_setting[2] -= 5
             if(game_setting[2]<0): game_setting[2] = 0
             self.count = game_setting[2]
             updateSetting(game_setting[2],game_setting[3])
+            music_and_sfx_volume(game_setting[2],game_setting[3])
         if(self.num == 7):
+            s_Cursor.play()
             game_setting[3] += 5
             if(game_setting[3]>100): game_setting[3] = 100
             self.count = game_setting[3]
             updateSetting(game_setting[2],game_setting[3])
+            music_and_sfx_volume(game_setting[2],game_setting[3])
         if(self.num == 8):
+            s_Cursor.play()
             game_setting[3] -= 5
             if(game_setting[3]<0): game_setting[3] = 0
             self.count = game_setting[3]
             updateSetting(game_setting[2],game_setting[3])
+            music_and_sfx_volume(game_setting[2],game_setting[3])
         if(self.num == 9):          
             setFullScreen()
             self.count = int(fullscreen)
@@ -272,13 +332,6 @@ class MainItem:
         if(self.num == 10):
             gameReset = True
             
-
-
-
-
-
-
-
 class Num:
     def __init__(self, value=0):
         self.value =value
@@ -323,6 +376,7 @@ class Weapon:
 
         self.damage = 0
         self.add_damage = 0
+        self.multi_damage = 1
 
         self.preSetWeapon()
 
@@ -581,6 +635,10 @@ class Weapon:
         
         return question, answer 
 
+    def damageIt(self,char):
+        char.health -= math.ceil(self.damage*self.multi_damage) + self.add_damage
+
+
     def levelUp(self):
         self.exp = 0
         self.count += 1
@@ -590,13 +648,25 @@ class Weapon:
         else:
             self.max_exp = self.lvUpList[self.count]
         self.damage = self.dmgList[self.count]
-        
+    def levelDown(self):
+        self.exp = 0
+        self.count -= 1
+        if self.count <= -1:
+            self.max_exp = self.lvUpList[0]
+            self.count = 0
+        else:
+            self.max_exp = self.lvUpList[self.count]
+        self.damage = self.dmgList[self.count]
+    def addTime(self,add):
+        self.time += add*60
+        self.max_time = self.time
+                
 
 class Item:
-    def __init__(self,name,id,level=0, message=[""], icon=pygame.Surface((16,16))):
+    def __init__(self,name,id,message=[""], icon=pygame.Surface((16,16)),type="P"):
         self.tag = "Weapon"
         self.id = id 
-        self.count = level
+        self.count = 0
         self.time = 300
         self.max_time = self.time
 
@@ -604,19 +674,33 @@ class Item:
         self.message = message
         self.icon = icon
         self.equip = False
+        if type == "W":
+            self.equip = True
+        if type == "A":
+            pass
+
     def active(self):
         if(self.id == 1):
             battleManager.player.heal(5)
-            self.kill()
         if(self.id == 2):
             battleManager.player.max_health += 10
             battleManager.player.health += 10
-            self.kill()
-        if(self.id == 3):
-            self.equip = True
+        if self.id == 8:
+            battleManager.player.speed += 1
+        if not self.equip: self.kill()
+        
     def equip_active(self,weapon):
         if self.id == 3:
             weapon.levelUp()
+        if self.id == 4:
+            weapon.levelDown()
+        if self.id == 14:
+            weapon.addTime(-1)
+            weapon.multi_damage += 0.5
+        if self.id == 15:
+            weapon.addTime(0.5)
+        
+        
         self.kill()
 
     def kill(self):
@@ -815,11 +899,12 @@ class Enemy:
         self.saved_pos = pos
 
 class Stage:
-    def __init__(self,num,enemys = []):
+    def __init__(self,num,enemys = [],items = []):
         self.index = -1
         self.num = num
         self.enemys = enemys
         self.enemy_line = []
+        self.items = items
 
         self.easy_preset = [
             [self.enemys[0],0.5,0],\
@@ -900,10 +985,10 @@ class Stage:
         else:
             self.enemy_line = [[pe[0]],[pe[1]],[pe[2]],[pe[3],pe[4]],[pe[16]],[pe[6],pe[7]],[pe[8],pe[9]],[pe[10],pe[11],pe[12]],[pe[13],pe[14],pe[15]],[pe[5]]]
 
-            
-
     def getEnemy(self):
         self.index += 1
+        if self.index == 4 or self.index == 9:
+            battleManager.bossWeapon =  copy(self.enemy_line[self.index][0].weapon)
         return self.enemy_line[self.index]
 
 class BattleManager:
@@ -921,14 +1006,18 @@ class BattleManager:
         self.battlePre = False
         self.count = 0
 
-        # self.stage1 = Stage(1,[enemys["새새색"],enemys["배애앰"],enemys["장난질"],enemys["직각"],enemys["마르"]])
-        self.stage1 = Stage(2,[enemys["빅"],enemys["툣끼"],enemys["슬라임"],enemys["감마"],enemys["델타"]])
-        # self.stage3 = Stage(3,[enemys["새새색"],enemys["배애앰"],enemys["장난질"]])
+        self.stage1 = Stage(1,[enemys["새새색"],enemys["배애앰"],enemys["장난질"],enemys["직각"],enemys["마르"]],[items["새의심장"],items["뱀의독"],items["도둑질"]])
+        self.stage2 = Stage(2,[enemys["스피릿"],enemys["툣끼"],enemys["슬라임"],enemys["감마"],enemys["델타"]],[items["계산기요정"],items["토끼발"],items["말랑슬라임"],items["슷퍼 포도당"],items["초월강화성공"]])
+        self.stage3 = Stage(3,[enemys["오십퍼"],enemys["영점오"],enemys["드론"],enemys["백"],enemys["빅"]],[items["조준"],items["광선검"],items["교정드론"]])
         self.curStage = self.stage1
 
         self.item_get = False
         self.randItems = []
         self.itemEquip = False
+        self.cur_wave = 0
+
+        self.bossWeapon = 0
+        self.normalItems = [items["정신극복"],items["숫돌"],items["강화실패"],items["E드링크"],items["긴장감"],items["여유"]]
 
     def addPlayerWeaponSlot(self,weapon):
         self.player_WeaponSlot.append(Battle(self.player,weapon))
@@ -939,13 +1028,12 @@ class BattleManager:
             for enemy in self.enemys:
                 for _ in range(0,enemy.speed):
                     enemy_WeaponSlot.append(Battle(enemy,enemy.weapon))
-
             self.battle_Chain.extend(self.player_WeaponSlot)
-            self.battle_Chain.extend(enemy_WeaponSlot)
+            a = len(enemy_WeaponSlot)
+            for i in range(0,a):
+                self.battle_Chain.insert(randNum(0,len(self.battle_Chain)),enemy_WeaponSlot.pop(0))
 
-            self.battle_Chain = mixList(self.battle_Chain)
             
-
             self.battle_Chain_max = len(self.battle_Chain)
             progressBar.updateProgress(self.battle_Chain,self.battle_Chain_max)
             self.battlePre = True
@@ -962,19 +1050,27 @@ class BattleManager:
         progressBar.updateProgress(self.battle_Chain,self.battle_Chain_max)
 
     def setEnemys(self):
+        # 스테이지 에서 스테이지에 따른 적리스트 가져오기
         for index in self.curStage.getEnemy():
             self.enemys.append(copy(index))
 
-    def suffleItem(self):
+    def suffleItem(self): 
         self.randItems = []
+        stageItems = copy(self.curStage.items)
+        normalItems = copy(self.normalItems)
+        if self.curStage.index == 4 or self.curStage.index == 9:
+            self.randItems.append(copy(self.bossWeapon))
+            if self.curStage.index == 9:
+                rand = randNum(0,len(stageItems))
+                self.randItems.append(copy(stageItems.pop(rand)))
+        rand = randNum(0,len(stageItems))
+        self.randItems.append(copy(stageItems.pop(rand)))
+        rand = randNum(0,len(normalItems))
+        self.randItems.append(copy(normalItems.pop(rand)))
+        rand = randNum(0,len(normalItems))
+        self.randItems.append(copy(normalItems.pop(rand)))
         self.randItems.append(copy(items["포도당"]))
-        self.randItems.append(copy(items["정신극복"]))
-        self.randItems.append(copy(items["숫돌"]))
-        self.randItems.append(copy(weapons["마너스검"]))
-        self.randItems.append(copy(weapons["구구단검"]))
-
-
-      
+   
 
 class Battle:
     def __init__(self,attack,weapon):
@@ -995,7 +1091,8 @@ class Battle:
     def update(self,player,enemys):
         global keys, stamp_list, screenCount
         #region 전투돌입 전
-        if(self.first):       
+        if(self.first):      
+            s_nice.play() 
             if(len(self.question) == 0): self.question, self.answer = self.weapon.getWeapon()  
               
             if(self.attack.tag == "Player"):
@@ -1020,6 +1117,11 @@ class Battle:
         if(self.input != "" and not self.delay and not self.failed): # 답 입력시
             if(len(str(self.question[self.answer[0]].value)) == len(self.input)):
                 if(self.question[self.answer[0]].text == self.input):
+                    if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul:
+                        s_success2.play()
+                    else:
+                        s_success1.play()
+
                     self.originWeapon.exp += 1
                     if self.originWeapon.exp >= self.originWeapon.max_exp: 
                         self.originWeapon.levelUp()
@@ -1029,14 +1131,16 @@ class Battle:
                         self.defend.condition = 4
                         if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul:
                             self.weapon.damage *= 2
-                        self.defend.health -=  self.weapon.damage+self.weapon.add_damage
+                        self.weapon.damageIt(self.defend)
+                        print(self.defend.health)
                         self.attack.setMove(540-CENTERDIS-knockback,10)
                         self.defend.setMove(540+CENTERDIS+knockback,10)
                     if(self.defend.tag == "Player"):
                         self.attack.condition = 3
                         self.defend.condition = 3
                         if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul:
-                            self.attack.health -=  math.ceil((self.weapon.damage+self.weapon.add_damage)/2)
+                            self.weapon.damage *= 0.5
+                        self.weapon.damageIt(self.attack)
                         self.attack.condition = 4
                         self.attack.setMove(540+CENTERDIS+knockback//2,10)
                         self.defend.setMove(540-CENTERDIS-knockback//2,10)
@@ -1045,6 +1149,7 @@ class Battle:
                     self.delay = True
                 else:
                     self.input = ""
+                    s_failed.play()
                     self.failed = True
                     self.weapon.time = 0
 
@@ -1061,6 +1166,7 @@ class Battle:
                     if enemy.health <= 0:
                         x = 80
                         y = 80
+                        s_enep.play()
                         stamp_list.append(Stamp((enemy.pos+120+x,CHARY+y),1))
                         stamp_list.append(Stamp((enemy.pos-120+x,CHARY+y),1))
                         stamp_list.append(Stamp((enemy.pos+x,CHARY+120+y),1))
@@ -1074,9 +1180,10 @@ class Battle:
                             battleManager.battle_Chain = []
                 else:
                     player = self.attack if self.attack.tag == "Player" else self.defend
-                    if player.health <= 0:
+                    if player.health <= 0:                                                
                         x = -80
                         y = 80
+                        s_enep.play()
                         stamp_list.append(Stamp((player.pos+120+x,CHARY+y),1))
                         stamp_list.append(Stamp((player.pos-120+x,CHARY+y),1))
                         stamp_list.append(Stamp((player.pos+x,CHARY+120+y),1))
@@ -1096,6 +1203,8 @@ class Battle:
         if(self.weapon.time <= 0 and not self.delay):   
 
             if not self.bool:
+                self.failed = True
+                s_failed.play()
                 if self.originWeapon.count != 5:
                     self.originWeapon.exp += 1
                     if self.originWeapon.exp >= self.originWeapon.max_exp: 
@@ -1104,16 +1213,15 @@ class Battle:
                 if(self.attack.tag == "Enemy"):
                     self.attack.condition = 3
                     self.defend.condition = 4
-                    self.defend.health -=  self.weapon.damage +self.weapon.add_damage
+                    self.weapon.damageIt(self.defend)
                     self.attack.setMove(540+CENTERDIS+knockback//2,10)
                     self.defend.setMove(540-CENTERDIS-knockback//2,10)
 
                 if(self.defend.tag == "Enemy"):
                     self.attack.condition = 4
                     self.defend.condition = 3
-                    # if self.weapon.time > self.weapon.max_time - self.weapon.max_time/battleManager.player.time_beul:
-                    #     self.weapon.damage *= 2
-                    self.attack.health -=  math.ceil((self.weapon.damage+self.weapon.add_damage)/2)
+                    self.weapon.damage *= 0.5
+                    self.weapon.damageIt(self.attack)
                     self.attack.setMove(540-CENTERDIS-knockback,10)
                     self.defend.setMove(540+CENTERDIS+knockback,10)
 
@@ -1125,6 +1233,8 @@ class Battle:
                 try:
                     if(len(battleManager.battle_Chain) >= 1):       
                         del battleManager.battle_Chain[0]
+                        battleManager.cur_wave += 1
+                        # 공격한 적이 모든 공격을 다할시 원위치로 돌아가기
                         if(not battleManager.battle_Chain[0].attack == enemy or not battleManager.battle_Chain[0].defend == enemy):
                             enemy.image = enemy.idle1
                             enemy.condition = 0
@@ -1230,9 +1340,9 @@ class ProgressBar:
         for index in self.render_list:
             color = (0,0,0)
             if index.attack.tag == "Player":
-                color = (0,255,0)
+                color = (255,255,255)
             if index.attack.tag == "Enemy":
-                color = (0,255,255)
+                color = (0,0,0)
             self.render_final.append(ProgressBox(0,0,color))
         self.render_max = max
 
@@ -1246,11 +1356,11 @@ class ProgressBar:
 
 class BackGround:
     def __init__(self,image,speed,y):
-        self.image = pygame.transform.scale2x(image)
+        self.image = image
         self.speed = speed
         self.y = y
         self.x = self.image.get_rect().width
-    def draw(self,bgx):
+    def draw(self,screen,bgx):
         rel_x = -bgx*self.speed % self.x 
         screen.blit(self.image, (rel_x - self.x ,self.y))
         if rel_x < self.x :
@@ -1274,7 +1384,7 @@ class Stamp:
             self.count += 2
             try:self.image = white_circle[self.count]
             except: stamp_list.remove(self)
-        if self.num == 2 or self.num == 3 or self.num == 4:
+        if self.num == 2 or self.num == 3 or self.num == 4 or self.num == 5:
             self.count += 40
             if self.count >= 540:
                 self.count = 540
@@ -1296,6 +1406,9 @@ class Stamp:
         if self.num == 4:
             screen.blit(ItemAppearSprite,(-540+self.count,150-self.count3),(0,0,540,200))
             screen.blit(ItemAppearSprite,(1080-self.count,150-self.count3),(540,0,540,200))
+        if self.num == 5:
+            screen.blit(strongAppearSprite,(-540+self.count,200-self.count3),(0,0,540,200))
+            screen.blit(strongAppearSprite,(1080-self.count,200-self.count3),(540,0,540,200))
 
 
 
@@ -1351,9 +1464,24 @@ weapons = {
 }
 
 items = {
-    "포도당": Item("포도당",1),
-    "정신극복": Item("정신극복",2),
-    "숫돌": Item("숫돌",3)
+    "포도당": Item("포도당",1,["[소비]체력+5","공부할때 중요한것","역시 단것입니다"],menu_icon[14]),
+    "정신극복": Item("자신감",2,["[소비]최대체력+10","자신감을 가지면","숨겨져 있던 힘이 생길거네요","근데 그게 체력이네 흠..."],menu_icon[15]),
+    "숫돌": Item("숫돌",3,["[장착]레벨+1","당신의 무기가 너무 시시한가요?","그럼 이걸 쓰세요","그리고 뜻밖의 공포를 느끼세요!"],menu_icon[16]),
+    "강화실패": Item("강화실패",4,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],menu_icon[17],'W'),
+    "새의심장": Item("새의심장",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[0],64,0,32,32,4),'W'),
+    "뱀의독": Item("뱀의독",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[1],64,0,32,32,4)),
+    "도둑질": Item("도둑질",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[2],64,0,32,32,4)),
+    "E드링크": Item("E드링크",8,["[소비]무기장착 한도+1","한가지만 쓰든 여러개를 쓰든","뭐든지 많이 할수록 좋습니다","역시 이 고카페인 음료가 한목 하는군요"],menu_icon[18]),
+    "계산기요정": Item("계산기요정",1,["[소비]","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[3],64,0,32,32,4)),
+    "토끼발": Item("토끼발",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[4],64,0,32,32,4)),
+    "말랑슬라임": Item("말랑슬라임",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[5],64,0,32,32,4)),
+    "슷퍼 포도당": Item("슷퍼 포도당",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],menu_icon[23]),
+    "초월강화성공": Item("초월강화성공",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],menu_icon[19]),
+    "긴장감": Item("긴장감",14,["[장착]제한시간-1초,공격력*1.5","시간은 곧 무기입니다","남들이 쉴동안 더 일을 해놓으면","남은 시간동안 또다른 일을 해야죠"],menu_icon[21],'W'),
+    "여유": Item("여유",15,["[장착]제한기간+0.5초","자에게 시간이 좀 더 있었더라면","원하는 모든건 다 할 수 있을텐데"],menu_icon[22],'W'),
+    "조준": Item("조준",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[6],64,0,32,32,4)),
+    "광선검": Item("광선검",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[7],64,0,32,32,4)),
+    "교정드론": Item("교정드론",1,["[장착]레벨-1","당신의 무기가 광기에 물들었나요?","그럼 이걸 쓰세요","역시 적당한게 좋아요"],convertImage(spr_char1[0],64,0,32,32,4))
 }
 
 enemys = {
@@ -1569,22 +1697,27 @@ def play_game():
                 keys["9"] = event.key == pygame.K_KP9
                 keys["minus"] = event.key == pygame.K_KP_MINUS
                 keys["slice"] = event.key == pygame.K_KP_DIVIDE or event.key == pygame.K_RIGHT
+                if battleManager.battleStart:
+                    s_input.play()
                 if event.key == K_F4: setFullScreen()
 
         if(menuAble):
             if curMenu == "Upper":
                 
                 if keys["left"]:
+                    s_Decision.play()
                     curMenu = "Main"                    
                     render = mainItems[mainCurser]
                     if battleManager.itemEquip: battleManager.itemEquip = False
                 if keys["right"]:
+                    
                     if battleManager.item_get:
                         if(upperItems[upperCurser].__class__.__name__ == "Weapon"):
                             battleManager.player.giveWeapon(upperItems[upperCurser])
                         elif(upperItems[upperCurser].__class__.__name__ == "Item"):
                             battleManager.player.giveItem(upperItems[upperCurser])
                         upperItems = battleManager.player.weapon
+                        s_Item.play()
                         battleManager.item_get = False
                     elif battleManager.itemEquip:
                         downerItems[downerCurser].equip_active(upperItems[upperCurser])
@@ -1596,12 +1729,15 @@ def play_game():
                             curMenu = "Main"
 
                     else:
+                        s_Equip.play()
                         upperItems[upperCurser].active() # 아이템 발동
                 if keys["up"]:
+                    s_Cursor.play()
                     upperCurser -= 1
                     if upperCurser < 0: upperCurser = len(upperItems)-1
                     render = upperItems[upperCurser]
                 if keys["down"]:
+                    s_Cursor.play()
                     upperCurser += 1
                     if upperCurser >= len(upperItems):  upperCurser = 0 
                     render = upperItems[upperCurser]
@@ -1610,6 +1746,7 @@ def play_game():
                 try:
                     if downerCurser > len(downerItems): downerCurser = len(downerItems)-1
                     if keys["left"]:
+                        s_Decision.play()
                         curMenu = "Main"
                         render = mainItems[mainCurser]
                     if keys["right"]:
@@ -1624,10 +1761,12 @@ def play_game():
                                 curMenu = "Main"
                         
                     if keys["up"]:
+                        s_Cursor.play()
                         downerCurser -= 1
                         if downerCurser < 0: downerCurser = len(downerItems)-1
                         render = downerItems[downerCurser]
                     if keys["down"]:
+                        s_Cursor.play()
                         downerCurser += 1
                         if downerCurser >= len(downerItems): downerCurser = 0
                         render = downerItems[downerCurser]
@@ -1639,6 +1778,7 @@ def play_game():
                     
             elif curMenu == "Main":
                 if keys["right"]:
+                    s_Decision.play()
                     if(mainCurser == 0 and len(upperItems) > 0):
                         curMenu = "Upper"
                         render = upperItems[upperCurser]
@@ -1646,10 +1786,12 @@ def play_game():
                         curMenu = "Downer"
                         render = downerItems[downerCurser]
                 if keys["up"]:
+                    s_Cursor.play()
                     mainCurser -= 1
                     if mainCurser < 0: mainCurser = 1
                     render = mainItems[mainCurser]
                 if keys["down"]:
+                    s_Cursor.play()
                     mainCurser += 1
                     if mainCurser > 1: mainCurser = 0
                     render = mainItems[mainCurser]
@@ -1692,7 +1834,13 @@ def play_game():
             if(count == 1):
                 battleManager.player.idlespd =5
             if(count == 60):
-                stamp_list.append(Stamp((0,0),2))
+                s_noise.play()
+                if battleManager.curStage.index == 3:
+                    stamp_list.append(Stamp((0,0),5))
+                elif battleManager.curStage.index == 8:
+                    stamp_list.append(Stamp((0,0),3))
+                else:
+                    stamp_list.append(Stamp((0,0),2))
             if(count == 120):          
                 battleManager.setEnemys()
                 if len(battleManager.enemys) == 1:
@@ -1713,13 +1861,16 @@ def play_game():
 
             if(len(battleManager.player_WeaponSlot) >= game_player.speed and not battleStart):
                 if keys["enter"]: # 커맨드 모두 입력시
+                    s_Flash.play()
                     battleManager.battleStart = True
                     progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.speed)
                 if keys["back"]: 
+                    s_Hammer.play()
                     battleManager.player_WeaponSlot = []
                     progressBar.updateProgress(battleManager.player_WeaponSlot,battleManager.player.speed)
             
             if(battleManager.battleStart): 
+                menuAble = False
                 battleManager.battle()
                 if(len(battleManager.enemys) <= 0): # 적이 없을시
                     battleManager.item_get = True
@@ -1730,7 +1881,9 @@ def play_game():
                     # count = 0
 
             if(battleManager.item_get):
+                menuAble = True
                 if count == 160:
+                    s_itemGet.play()
                     stamp_list.append(Stamp((0,0),4))
                     battleManager.suffleItem()
                     upperItems = battleManager.randItems
@@ -1876,7 +2029,7 @@ def play_game():
         #region 오른쪽 메세지창,아이콘
         text_color = (255, 255, 255)
         for i in range(0,len(render.message)):            
-            if(i==0): text = capitextFont.render(render.message[i],True,text_color)
+            if(i==0): text = capitextFont.render(render.message[i],True,text_color) # 첫줄은 제목처럼
             else:text = textFont.render(render.message[i],True,text_color)
             text_rect = text.get_rect()
             menu_render.blit(text,(770-text_rect.centerx,226+i*30))
@@ -1899,7 +2052,8 @@ def play_game():
 
         if(len(background_list) > 0):
             for img in background_list:
-                img.draw(bgx)  
+                img.draw(half_screen,bgx)
+        screen.blit(pygame.transform.scale2x(half_screen),(0,0))
             
              
         screen.blit(menu,(0,0))
@@ -1955,6 +2109,7 @@ def drawText(font,text,screen,x,y,color=(255,255,255)):
 
 
 def gameStart():
+    s_Flash.play()
     global menuAble
     global game_start
     global game_lobby
@@ -1970,7 +2125,7 @@ def gameStart():
     game_start = True
     game_lobby = False
     mainItems[0] = LobbyItem("전투",["전투","게임을 시작합니다","그리고 끔찍한 악몽이 시작됩니다"], menu_icon[0])
-    mainItems[1] = LobbyItem("아이템",["아이템","게임을 시작합니다","그리고 끔찍한 악몽이 시작됩니다"], menu_icon[1]  )
+    mainItems[1] = LobbyItem("아이템",["아이템","게임을 시작합니다","그리고 끔찍한 악몽이 시작됩니다"], menu_icon[13]  )
     upperItems = game_player.weapon
     downerItems = game_player.item
 
